@@ -1,0 +1,9 @@
+# Test files and core dumps
+test.*
+vgcore.*
+
+# Binary executables - they're useless for the delivery!
+tecnicofs
+
+# Editor settings
+.vscode
