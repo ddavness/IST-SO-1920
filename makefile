@@ -1,18 +1,32 @@
-# This is the makefile for the TecnicoFS project.
-#
-# By: David Duque, nº 93698
-#     Filipe Ferro, nº 70611
+# Makefile, versao 1
+# Sistemas Operativos, DEI/IST/ULisboa 2019-20
 
-CC = gcc
-CFLAGS = -std=c11 -pedantic -Wall -Wextra -Werror
-CFLAGS_DEBUG = -g
-CFLAGS_OPTIMIZE = -O3
+CC   = gcc
+LD   = gcc
+CFLAGS =-Wall -std=gnu99 -I../
+LDFLAGS=-lm
 
-# We're compiling the main source and utilities that we wrote.
-FILES = src/*.c src/lib/*.c
+# A phony target is one that is not really the name of a file
+# https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
+.PHONY: all clean run
 
-make:
-	$(CC) $(FILES) $(CFLAGS) -o tecnicofs
+all: tecnicofs
 
-debug:
-	$(CC) $(FILES) $(CFLAGS) $(CFLAGS_DEBUG) -o tecnicofs
+tecnicofs: lib/bst.o fs.o main.o
+	$(LD) $(CFLAGS) $(LDFLAGS) -o tecnicofs lib/bst.o fs.o main.o
+
+lib/bst.o: lib/bst.c lib/bst.h
+	$(CC) $(CFLAGS) -o lib/bst.o -c lib/bst.c
+
+fs.o: fs.c fs.h lib/bst.h
+	$(CC) $(CFLAGS) -o fs.o -c fs.c
+
+main.o: main.c fs.h lib/bst.h
+	$(CC) $(CFLAGS) -o main.o -c main.c
+
+clean:
+	@echo Cleaning...
+	rm -f lib/*.o *.o tecnicofs
+
+run: tecnicofs
+	./tecnicofs
