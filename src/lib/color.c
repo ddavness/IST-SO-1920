@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "default.h"
+#include <stdbool.h>
 #include "color.h"
 
 char* addColorInfo(char* text, bool makeBold, int color) {

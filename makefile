@@ -1,10 +1,14 @@
 # Makefile, versao 1
 # Sistemas Operativos, DEI/IST/ULisboa 2019-20
 
-CC   = gcc
-LD   = gcc
-CFLAGS =-Wall -std=gnu99 -I../
-LDFLAGS=-lm
+CC = gcc
+LD = gcc
+
+SRC = src/
+OUT = out/
+
+CFLAGS = -pedantic -Wall -Wextra -Werror -std=c11 -I../
+LDFLAGS= -lm
 
 # A phony target is one that is not really the name of a file
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
@@ -12,21 +16,24 @@ LDFLAGS=-lm
 
 all: tecnicofs
 
-tecnicofs: lib/bst.o fs.o main.o
-	$(LD) $(CFLAGS) $(LDFLAGS) -o tecnicofs lib/bst.o fs.o main.o
+tecnicofs: out/lib/bst.o out/lib/color.o out/fs.o out/main.o
+	$(LD) $(CFLAGS) $(LDFLAGS) -o tecnicofs out/lib/bst.o out/lib/color.o out/fs.o out/main.o
 
-lib/bst.o: lib/bst.c lib/bst.h
-	$(CC) $(CFLAGS) -o lib/bst.o -c lib/bst.c
+out/lib/bst.o: src/lib/bst.c src/lib/bst.h
+	$(CC) $(CFLAGS) -o out/lib/bst.o -c src/lib/bst.c
 
-fs.o: fs.c fs.h lib/bst.h
-	$(CC) $(CFLAGS) -o fs.o -c fs.c
+out/lib/color.o: src/lib/color.c src/lib/color.h
+	$(CC) $(CFLAGS) -o out/lib/color.o -c src/lib/color.c
 
-main.o: main.c fs.h lib/bst.h
-	$(CC) $(CFLAGS) -o main.o -c main.c
+out/fs.o: src/fs.c src/fs.h src/lib/bst.h
+	$(CC) $(CFLAGS) -o out/fs.o -c src/fs.c
+
+out/main.o: src/main.c src/fs.h src/lib/bst.h src/lib/color.h
+	$(CC) $(CFLAGS) -o out/main.o -c src/main.c
 
 clean:
 	@echo Cleaning...
-	rm -f lib/*.o *.o tecnicofs
+	rm -f out/lib/*.o out/*.o tecnicofs
 
 run: tecnicofs
 	./tecnicofs

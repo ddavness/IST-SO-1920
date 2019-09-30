@@ -3,6 +3,8 @@
 #include <getopt.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdbool.h>
+#include "lib/color.h"
 #include "fs.h"
 
 #define MAX_COMMANDS 150000
@@ -16,13 +18,13 @@ int numberCommands = 0;
 int headQueue = 0;
 
 static void displayUsage (const char* appName){
-    printf("Usage: %s\n", appName);
+    printf(red("Usage: %s\n", false), appName);
     exit(EXIT_FAILURE);
 }
 
 static void parseArgs (long argc, char* const argv[]){
     if (argc != 1) {
-        fprintf(stderr, "Invalid format:\n");
+        fprintf(stderr, red("Invalid format:\n", true));
         displayUsage(argv[0]);
     }
 }
@@ -44,7 +46,7 @@ char* removeCommand() {
 }
 
 void errorParse(){
-    fprintf(stderr, "Error: command invalid\n");
+    fprintf(stderr, yellow("Error: Invalid Command!\n", false));
     //exit(EXIT_FAILURE);
 }
 

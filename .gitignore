@@ -2,8 +2,9 @@
 test.*
 vgcore.*
 
-# Binary executables - they're useless for the delivery!
+# Binary executables and object code - they're useless for the delivery!
 tecnicofs
+*.o
 
 # Editor settings
 .vscode
