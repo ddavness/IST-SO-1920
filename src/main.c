@@ -158,7 +158,7 @@ void applyCommands(int begin, int hop){
         char name[MAX_INPUT_SIZE];
         int numTokens = sscanf(command, "%c %s", &token, name);
         if (numTokens != 2) {
-            fprintf(stderr, red_bold("Error: invalid command in Queue\n"));
+            fprintf(stderr, "%s %c %s", red_bold("Error: Invalid command in Queue:\n"), token, name);
             exit(EXIT_FAILURE);
         }
 
@@ -180,7 +180,7 @@ void applyCommands(int begin, int hop){
                 delete(fs, name);
                 break;
             default: { /* error */
-                fprintf(stderr, "Error: command to apply\n");
+                fprintf(stderr, "%s %c %s", red_bold("Error: Invalid command in Queue:\n"), token, name);
                 exit(EXIT_FAILURE);
             }
         }
@@ -192,13 +192,12 @@ int main(int argc, char** argv) {
 
     // Try to open the output file, so that we can catch the error early!
     // Possible errors when opening/creating the file: Access denied
-    FILE* output_test = fopen(argv[2], "w");
-    if (!output_test) {
+    FILE* output = fopen(argv[2], "w");
+    if (!output) {
         fprintf(stderr, red_bold("Unable to open file '%s'!"), argv[2]);
         perror("\nError");
         exit(EXIT_FAILURE);
     }
-    fclose(output_test);
 
     processInput(argv[1]);
     fs = new_tecnicofs();
@@ -219,7 +218,8 @@ int main(int argc, char** argv) {
         LOCK_DESTROY(&LOCK);
     }
 
-    print_tecnicofs_tree(stdout, fs);
+    print_tecnicofs_tree(output, fs);
+    fclose(output);
 
     free_tecnicofs(fs);
     clock_t end = clock();
