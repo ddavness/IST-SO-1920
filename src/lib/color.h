@@ -17,7 +17,7 @@
 #define COLOR_YELLOW "\x1b[93m"
 
 #define COLOR_RED_BOLD "\x1b[1;91m"
-#define COLOR_GREEN_BOLD "\x1b[92m"
+#define COLOR_GREEN_BOLD "\x1b[1;92m"
 #define COLOR_YELLOW_BOLD "\x1b[1;93m"
 
 
