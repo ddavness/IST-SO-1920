@@ -17,28 +17,36 @@
 #define RWLOCK 1
 #if defined(MUTEX)
     // Map macros to mutex
+
     pthread_mutex_t* LOCK;
     #define LOCK_INIT pthread_mutex_init
-    #define LOCK_CLOSE pthread_mutex_lock
+    #define LOCK_CLOSE_READ pthread_mutex_lock
+    #define LOCK_CLOSE_WRITE pthread_mutex_lock
     #define LOCK_OPEN pthread_mutex_unlock
     #define LOCK_DESTROY pthread_mutex_destroy
 
     #define NOSYNC false
 #elif defined(RWLOCK)
     // Map macros to RWLOCK
-    pthread_rwlock_t rwlock;
+
     pthread_rwlock_t* LOCK;
     #define LOCK_INIT pthread_rwlock_init
-    #define LOCK_CLOSE pthread_rwlock_lock
+    #define LOCK_CLOSE_READ pthread_rwlock_rdlock
+    #define LOCK_CLOSE_WRITE pthread_rwlock_wrlock
     #define LOCK_OPEN pthread_rwlock_unlock
     #define LOCK_DESTROY pthread_rwlock_destroy
 
     #define NOSYNC false
 #else
-    // Nosync
+    /*
+       Nosync. These macros are only defined so that the compiler
+       doesn't complain that much.
+    */
+
     void* LOCK;
     #define LOCK_INIT NULL
-    #define LOCK_CLOSE NULL
+    #define LOCK_CLOSE_READ NULL
+    #define LOCK_CLOSE_WRITE NULL
     #define LOCK_OPEN NULL
     #define LOCK_DESTROY NULL
 
@@ -140,7 +148,7 @@ void processInput(char* input){
     fclose(file);
 }
 
-void applyCommands(){
+void applyCommands(begin, hop){
     while(numberCommands > 0){
         const char* command = removeCommand();
         if (command == NULL){
@@ -194,11 +202,12 @@ int main(int argc, char** argv) {
     clock_t start = clock();
 
     if (NOSYNC) {
+        // No need to apply any sort of commands, just run applyCommands-as-is
         applyCommands();
     } else {
         // Initialize the IO lock.
         LOCK_INIT(LOCK, NULL);
-        
+        applyCommands();
     }
 
     print_tecnicofs_tree(stdout, fs);
