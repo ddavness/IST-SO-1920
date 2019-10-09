@@ -12,9 +12,10 @@
 #include <sys/types.h>
 
 #include "lib/color.h"
+#include "lib/void.h"
 #include "fs.h"
 
-#define RWLOCK 1
+//#define RWLOCK 0
 #if defined(MUTEX)
     // Map macros to mutex
 
@@ -40,15 +41,15 @@
 #else
     /*
        Nosync. These macros are only defined so that the compiler
-       doesn't complain that much.
+       doesn't complain!
     */
 
-    void LOCK;
-    #define LOCK_INIT NULL
-    #define LOCK_CLOSE_READ NULL
-    #define LOCK_CLOSE_WRITE NULL
-    #define LOCK_OPEN NULL
-    #define LOCK_DESTROY NULL
+    void* LOCK;
+    #define LOCK_INIT void_2arg
+    #define LOCK_CLOSE_READ void_1arg
+    #define LOCK_CLOSE_WRITE void_1arg
+    #define LOCK_OPEN void_1arg
+    #define LOCK_DESTROY void_1arg
 
     #define NOSYNC true
 #endif
@@ -64,7 +65,10 @@ int numberCommands = 0;
 int headQueue = 0;
 
 static void parseArgs (long argc, char** const argv){
-    if (argc != 4) {
+    // For the nosync edition, we are allowing the last argument
+    // (num_threads) to be ommitted, since it's redundant
+
+    if ((NOSYNC && argc != 4 && argc != 3) || (!NOSYNC && argc != 4)) {
         fprintf(stderr, red_bold("Invalid format!\n"));
         fprintf(stderr, red("Usage: %s %s %s %s\n"), argv[0], "input_file[.txt]", "output_file[.txt]", "num_threads");
         exit(EXIT_FAILURE);
@@ -98,7 +102,7 @@ void processInput(char* input){
 
     if (!file) {
         fprintf(stderr, red_bold("Unable to open file '%s'!"), input);
-        perror("\n");
+        perror("\nError");
         exit(EXIT_FAILURE);
     }
 
@@ -186,18 +190,33 @@ void applyCommands(int begin, int hop){
 int main(int argc, char** argv) {
     parseArgs(argc, argv);
 
+    // Try to open the output file, so that we can catch the error early!
+    // Possible errors when opening/creating the file: Access denied
+    FILE* output_test = fopen(argv[2], "w");
+    if (!output_test) {
+        fprintf(stderr, red_bold("Unable to open file '%s'!"), argv[2]);
+        perror("\nError");
+        exit(EXIT_FAILURE);
+    }
+    fclose(output_test);
+
     processInput(argv[1]);
     fs = new_tecnicofs();
     clock_t start = clock();
 
     if (NOSYNC) {
-        // Display a warn
+        // Display a warn if a thread argument was passed (and it is different than 1)
+        if (argv[3] && (argv[3][0] != '1' || argv[3][1] != '\0')) {
+            fprintf(stderr, yellow_bold("This program is ran in no-sync mode (sequentially), which means that it only runs one thread.\n"));
+        }
         // No need to apply any sort of commands, just run applyCommands-as-is
         applyCommands(0, 1);
     } else {
         // Initialize the IO lock.
         LOCK_INIT(&LOCK, NULL);
         applyCommands(0, 1);
+
+        LOCK_DESTROY(&LOCK);
     }
 
     print_tecnicofs_tree(stdout, fs);

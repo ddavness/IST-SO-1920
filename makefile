@@ -16,8 +16,8 @@ LDFLAGS= -lm -lpthread
 
 all: tecnicofs
 
-tecnicofs: out/lib/bst.o out/fs.o out/main.o
-	$(LD) $(CFLAGS) $(LDFLAGS) -o tecnicofs out/lib/bst.o out/fs.o out/main.o
+tecnicofs: out/lib/bst.o out/lib/void.o out/fs.o out/main.o
+	$(LD) $(CFLAGS) $(LDFLAGS) -o tecnicofs out/lib/bst.o out/lib/void.o out/fs.o out/main.o
 
 out/lib/bst.o: src/lib/bst.c src/lib/bst.h
 	$(CC) $(CFLAGS) -o out/lib/bst.o -c src/lib/bst.c
@@ -25,7 +25,10 @@ out/lib/bst.o: src/lib/bst.c src/lib/bst.h
 out/fs.o: src/fs.c src/fs.h src/lib/bst.h
 	$(CC) $(CFLAGS) -o out/fs.o -c src/fs.c
 
-out/main.o: src/main.c src/fs.h src/lib/bst.h src/lib/color.h
+out/lib/void.o: src/lib/void.c src/lib/void.h
+	$(CC) $(CFLAGS) -o out/lib/void.o -c src/lib/void.c
+
+out/main.o: src/main.c src/fs.h src/lib/bst.h src/lib/color.h src/lib/void.h
 	$(CC) $(CFLAGS) -o out/main.o -c src/main.c
 
 clean:
