@@ -15,7 +15,8 @@
 #include "lib/void.h"
 #include "fs.h"
 
-//#define RWLOCK 0
+// TODO: SWITCH TO THE CONDITIONAL COMPILATION METHOD
+#define RWLOCK 1
 #if defined(MUTEX)
     // Map macros to mutex
 
@@ -211,6 +212,14 @@ int main(int argc, char** argv) {
         // No need to apply any sort of commands, just run applyCommands-as-is
         applyCommands(0, 1);
     } else {
+        int threads = atoi(argv[3]);
+        if (threads < 1) {
+            fprintf(stderr, "%s\n%s %s\n", red_bold("Invalid number of threads!"), red("Expected a positive integer, got"), argv[3]);
+            fclose(output);
+            exit(EXIT_FAILURE);
+        } else {
+            fprintf(stderr, green("Spawning %d threads.\n\n"), threads);
+        }
         // Initialize the IO lock.
         LOCK_INIT(&LOCK, NULL);
         applyCommands(0, 1);
