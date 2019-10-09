@@ -15,6 +15,7 @@ tecnicofs* new_tecnicofs(){
 		perror("failed to allocate tecnicofs");
 		exit(EXIT_FAILURE);
 	}
+	fs->nextINumber = 0;
 	fs->bstRoot = NULL;
 	return fs;
 }

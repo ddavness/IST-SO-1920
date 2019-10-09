@@ -7,12 +7,12 @@ LD = gcc
 SRC = src/
 OUT = out/
 
-CFLAGS = -pedantic -Wall -Wextra -Werror -std=c11 -I../
-LDFLAGS= -lm
+CFLAGS = -pedantic -Wall -Wextra -Werror -std=gnu99 -g -I../
+LDFLAGS= -lm -lpthread
 
 # A phony target is one that is not really the name of a file
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
-.PHONY: all clean run
+.PHONY: all clean run remake nosync
 
 all: tecnicofs
 
@@ -34,6 +34,10 @@ out/main.o: src/main.c src/fs.h src/lib/bst.h src/lib/color.h
 clean:
 	@echo Cleaning...
 	rm -f out/lib/*.o out/*.o tecnicofs
+
+remake:
+	make clean
+	make
 
 run: tecnicofs
 	./tecnicofs
