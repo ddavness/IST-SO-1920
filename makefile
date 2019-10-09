@@ -8,7 +8,7 @@ SRC = src/
 OUT = out/
 
 CFLAGS = -pedantic -Wall -Wextra -Werror -std=gnu11 -g -I../
-LDFLAGS= -lm -lpthread
+LDFLAGS= -lm -pthread
 
 # A phony target is one that is not really the name of a file
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html

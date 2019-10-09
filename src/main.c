@@ -62,7 +62,6 @@ tecnicofs* fs;
 
 char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
 int numberCommands = 0;
-int headQueue = 0;
 
 static void parseArgs (long argc, char** const argv){
     // For the nosync edition, we are allowing the last argument
@@ -81,13 +80,6 @@ int insertCommand(char* data) {
         return 1;
     }
     return 0;
-}
-
-char* removeCommand() {
-    if (numberCommands > headQueue) {
-        return inputCommands[headQueue++];  
-    }
-    return NULL;
 }
 
 void errorParse(char token, char* name){
@@ -145,7 +137,7 @@ void processInput(char* input){
 
 void applyCommands(int begin, int hop){
     for (int i = begin; i < numberCommands; i += hop) {
-        const char* command = removeCommand();
+        const char* command = inputCommands[i];
         if (command == NULL){
             break;
         }
@@ -162,13 +154,13 @@ void applyCommands(int begin, int hop){
         int iNumber;
         switch (token) {
             case 'c':
-                LOCK_WRITE(&LOCK);
+                //LOCK_WRITE(&LOCK);
                 iNumber = obtainNewInumber(fs);
                 create(fs, name, iNumber);
-                LOCK_OPEN(&LOCK);
+                //LOCK_OPEN(&LOCK);
                 break;
             case 'l':
-                LOCK_READ(&LOCK);
+                //LOCK_READ(&LOCK);
                 searchResult = lookup(fs, name);
                 
                 if (!searchResult) {
@@ -177,22 +169,18 @@ void applyCommands(int begin, int hop){
                     printf("%s found with inumber %d\n", name, searchResult);
                 }
 
-                LOCK_OPEN(&LOCK);
+                //LOCK_OPEN(&LOCK);
                 break;
             case 'd':
-                LOCK_WRITE(&LOCK);
+                //LOCK_WRITE(&LOCK);
                 delete(fs, name);
-                LOCK_OPEN(&LOCK);
+                //LOCK_OPEN(&LOCK);
                 break;
             default: { /* error */
                 fprintf(stderr, "%s %c %s", red_bold("Error: Invalid command in Queue:\n"), token, name);
                 exit(EXIT_FAILURE);
             }
         }
-    }
-
-    if (!NOSYNC) {
-        pthread_exit(NULL);
     }
 }
 
@@ -230,7 +218,11 @@ void deploy(char** argv) {
             int* position = malloc(2 * sizeof(int));
             position[0] = i;
             position[1] = threads;
-            pthread_create(threadPool + (pthread_t)i, NULL, applyCommandsLauncher, position);
+            if (pthread_create(&threadPool[i], NULL, applyCommandsLauncher, position)) {
+                fprintf(stderr, red_bold("Failed to spawn the thread %d/%d!"), i, threads);
+                perror("\nError");
+                exit(EXIT_FAILURE);
+            }
         }
 
         // Wait until everyone is done.
@@ -269,6 +261,6 @@ int main(int argc, char** argv) {
     // TODO: CHECK WHETHER THIS IS A GOOD IDEA.
     double elapsed = ((double)(end - start)/CLOCKS_PER_SEC);
 
-    printf(green_bold("\nTecnicoFS completed in %.04f seconds.\n"), elapsed);
+    fprintf(stderr, green_bold("\nTecnicoFS completed in %.04f seconds.\n"), elapsed);
     exit(EXIT_SUCCESS);
 }
