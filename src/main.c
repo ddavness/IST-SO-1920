@@ -9,12 +9,14 @@
 #include <wait.h>
 #include <pthread.h>
 #include <sys/types.h>
+#include <sys/time.h>
 
 #include "lib/color.h"
 #include "lib/void.h"
 #include "fs.h"
 
 // TODO: SWITCH TO THE CONDITIONAL COMPILATION METHOD
+
 #define RWLOCK 1
 #if defined(MUTEX)
     // Map macros to mutex
@@ -154,13 +156,13 @@ void applyCommands(int begin, int hop){
         int iNumber;
         switch (token) {
             case 'c':
-                //LOCK_WRITE(&LOCK);
+                LOCK_WRITE(&LOCK);
                 iNumber = obtainNewInumber(fs);
                 create(fs, name, iNumber);
-                //LOCK_OPEN(&LOCK);
+                LOCK_OPEN(&LOCK);
                 break;
             case 'l':
-                //LOCK_READ(&LOCK);
+                LOCK_READ(&LOCK);
                 searchResult = lookup(fs, name);
                 
                 if (!searchResult) {
@@ -169,12 +171,12 @@ void applyCommands(int begin, int hop){
                     printf("%s found with inumber %d\n", name, searchResult);
                 }
 
-                //LOCK_OPEN(&LOCK);
+                LOCK_OPEN(&LOCK);
                 break;
             case 'd':
-                //LOCK_WRITE(&LOCK);
+                LOCK_WRITE(&LOCK);
                 delete(fs, name);
-                //LOCK_OPEN(&LOCK);
+                LOCK_OPEN(&LOCK);
                 break;
             default: { /* error */
                 fprintf(stderr, "%s %c %s", red_bold("Error: Invalid command in Queue:\n"), token, name);
@@ -246,9 +248,12 @@ int main(int argc, char** argv) {
         exit(EXIT_FAILURE);
     }
 
+    struct timespec start, end;
     processInput(argv[1]);
+
+    // This time getting approach was found on 
+    clock_gettime(CLOCK_MONOTONIC, &start);
     fs = new_tecnicofs();
-    clock_t start = clock();
 
     deploy(argv);
 
@@ -256,10 +261,10 @@ int main(int argc, char** argv) {
     fclose(output);
 
     free_tecnicofs(fs);
-    clock_t end = clock();
+    clock_gettime(CLOCK_MONOTONIC, &end);
 
     // TODO: CHECK WHETHER THIS IS A GOOD IDEA.
-    double elapsed = ((double)(end - start)/CLOCKS_PER_SEC);
+    double elapsed = (((double)(end.tv_nsec - start.tv_nsec)) / 1000000000.0) + ((double)(end.tv_sec - start.tv_sec));
 
     fprintf(stderr, green_bold("\nTecnicoFS completed in %.04f seconds.\n"), elapsed);
     exit(EXIT_SUCCESS);
