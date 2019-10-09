@@ -8,3 +8,6 @@ tecnicofs
 
 # Editor settings
 .vscode
+
+# Generated luatests
+luatest_*

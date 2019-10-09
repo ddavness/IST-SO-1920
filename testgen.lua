@@ -8,6 +8,8 @@
 
 --]]
 
+local FILE_HITRATE = 60
+
 local charset = {
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
     '-', '_', '.',
@@ -15,7 +17,13 @@ local charset = {
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
 }
 
+local namesInTree = {}
+
 function makeFName()
+    if (math.random(1, 100) < FILE_HITRATE) and (#namesInTree ~= 0) then
+        return namesInTree[math.random(1, #namesInTree)]
+    end
+
     local length = math.random(1, 90)
     local name = ""
 
@@ -27,6 +35,7 @@ function makeFName()
         -- I don't think we can actually have files that are only dots
         return makeFName()
     else
+        namesInTree[#namesInTree + 1] = name
         return name
     end
 end
