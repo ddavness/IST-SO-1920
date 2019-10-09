@@ -17,7 +17,6 @@
 
 // TODO: SWITCH TO THE CONDITIONAL COMPILATION METHOD
 
-#define RWLOCK 1
 #if defined(MUTEX)
     // Map macros to mutex
 
@@ -251,7 +250,7 @@ int main(int argc, char** argv) {
     struct timespec start, end;
     processInput(argv[1]);
 
-    // This time getting approach was found on 
+    // This time getting approach was found on https://stackoverflow.com/a/10192994
     clock_gettime(CLOCK_MONOTONIC, &start);
     fs = new_tecnicofs();
 

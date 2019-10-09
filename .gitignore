@@ -1,9 +1,10 @@
 # Test files and core dumps
 test.*
 vgcore.*
+*.txt
 
 # Binary executables and object code - they're useless for the delivery!
-tecnicofs
+tecnicofs-*
 *.o
 
 # Editor settings
