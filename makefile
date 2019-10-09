@@ -7,7 +7,7 @@ LD = gcc
 SRC = src/
 OUT = out/
 
-CFLAGS = -pedantic -Wall -Wextra -Werror -std=gnu99 -g -I../
+CFLAGS = -pedantic -Wall -Wextra -Werror -std=gnu11 -g -I../
 LDFLAGS= -lm -lpthread
 
 # A phony target is one that is not really the name of a file
@@ -16,14 +16,11 @@ LDFLAGS= -lm -lpthread
 
 all: tecnicofs
 
-tecnicofs: out/lib/bst.o out/lib/color.o out/fs.o out/main.o
-	$(LD) $(CFLAGS) $(LDFLAGS) -o tecnicofs out/lib/bst.o out/lib/color.o out/fs.o out/main.o
+tecnicofs: out/lib/bst.o out/fs.o out/main.o
+	$(LD) $(CFLAGS) $(LDFLAGS) -o tecnicofs out/lib/bst.o out/fs.o out/main.o
 
 out/lib/bst.o: src/lib/bst.c src/lib/bst.h
 	$(CC) $(CFLAGS) -o out/lib/bst.o -c src/lib/bst.c
-
-out/lib/color.o: src/lib/color.c src/lib/color.h
-	$(CC) $(CFLAGS) -o out/lib/color.o -c src/lib/color.c
 
 out/fs.o: src/fs.c src/fs.h src/lib/bst.h
 	$(CC) $(CFLAGS) -o out/fs.o -c src/fs.c

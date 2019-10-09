@@ -18,7 +18,7 @@
 #if defined(MUTEX)
     // Map macros to mutex
 
-    pthread_mutex_t* LOCK;
+    pthread_mutex_t LOCK;
     #define LOCK_INIT pthread_mutex_init
     #define LOCK_CLOSE_READ pthread_mutex_lock
     #define LOCK_CLOSE_WRITE pthread_mutex_lock
@@ -29,7 +29,7 @@
 #elif defined(RWLOCK)
     // Map macros to RWLOCK
 
-    pthread_rwlock_t* LOCK;
+    pthread_rwlock_t LOCK;
     #define LOCK_INIT pthread_rwlock_init
     #define LOCK_CLOSE_READ pthread_rwlock_rdlock
     #define LOCK_CLOSE_WRITE pthread_rwlock_wrlock
@@ -43,7 +43,7 @@
        doesn't complain that much.
     */
 
-    void* LOCK;
+    void LOCK;
     #define LOCK_INIT NULL
     #define LOCK_CLOSE_READ NULL
     #define LOCK_CLOSE_WRITE NULL
@@ -56,13 +56,6 @@
 #define MAX_COMMANDS 150000
 #define MAX_INPUT_SIZE 100
 
-struct ERR_MSG {
-    char* USAGE_ARGS_FMT;   // Show the user how to use the program
-    char* BAD_ARGS;         // The program was invoked with the wrong arguments - How mean!
-    char* BAD_CMD;          // The input file contains a bad command
-    char* IO_ERR;           // Problems with opening files (e.g. ENOENT, Access Denied, etc.)
-}ERR_MSG;
-
 int numberThreads = 0;
 tecnicofs* fs;
 
@@ -72,8 +65,8 @@ int headQueue = 0;
 
 static void parseArgs (long argc, char** const argv){
     if (argc != 4) {
-        fprintf(stderr, ERR_MSG.BAD_ARGS);
-        fprintf(stderr, ERR_MSG.USAGE_ARGS_FMT, argv[0], "input_file[.txt]", "output_file[.txt]", "num_threads");
+        fprintf(stderr, red_bold("Invalid format!\n"));
+        fprintf(stderr, red("Usage: %s %s %s %s\n"), argv[0], "input_file[.txt]", "output_file[.txt]", "num_threads");
         exit(EXIT_FAILURE);
     }
 }
@@ -95,8 +88,7 @@ char* removeCommand() {
 }
 
 void errorParse(char token, char* name){
-    fprintf(stderr, "%s %c %s\n", ERR_MSG.BAD_CMD, token, name);
-    //exit(EXIT_FAILURE);
+    fprintf(stderr, "%s %c %s\n", yellow("Error: Invalid Command!"), token, name);
 }
 
 void processInput(char* input){
@@ -105,7 +97,7 @@ void processInput(char* input){
     int errs = 0;
 
     if (!file) {
-        fprintf(stderr, ERR_MSG.IO_ERR, input);
+        fprintf(stderr, red_bold("Unable to open file '%s'!"), input);
         perror("\n");
         exit(EXIT_FAILURE);
     }
@@ -140,7 +132,7 @@ void processInput(char* input){
     }
 
     if (errs != 0) {
-        fprintf(stderr, red("Exiting\n", true));
+        fprintf(stderr, red_bold("Exiting\n"));
         exit(EXIT_FAILURE);
     }
 
@@ -148,7 +140,10 @@ void processInput(char* input){
     fclose(file);
 }
 
-void applyCommands(begin, hop){
+void applyCommands(int begin, int hop){
+    int a = begin;
+    int b = hop;
+    b = a; a = b;
     while(numberCommands > 0){
         const char* command = removeCommand();
         if (command == NULL){
@@ -159,7 +154,7 @@ void applyCommands(begin, hop){
         char name[MAX_INPUT_SIZE];
         int numTokens = sscanf(command, "%c %s", &token, name);
         if (numTokens != 2) {
-            fprintf(stderr, "Error: invalid command in Queue\n");
+            fprintf(stderr, red_bold("Error: invalid command in Queue\n"));
             exit(EXIT_FAILURE);
         }
 
@@ -189,12 +184,6 @@ void applyCommands(begin, hop){
 }
 
 int main(int argc, char** argv) {
-    // Deploy the error messages
-    ERR_MSG.USAGE_ARGS_FMT = red("Usage: %s %s %s %s\n", false);
-    ERR_MSG.BAD_ARGS = red("Invalid format!\n", true);
-    ERR_MSG.BAD_CMD = yellow("Error: Invalid Command!", false);
-    ERR_MSG.IO_ERR = red("Unable to open file '%s'!", true);
-
     parseArgs(argc, argv);
 
     processInput(argv[1]);
@@ -202,12 +191,13 @@ int main(int argc, char** argv) {
     clock_t start = clock();
 
     if (NOSYNC) {
+        // Display a warn
         // No need to apply any sort of commands, just run applyCommands-as-is
-        applyCommands();
+        applyCommands(0, 1);
     } else {
         // Initialize the IO lock.
-        LOCK_INIT(LOCK, NULL);
-        applyCommands();
+        LOCK_INIT(&LOCK, NULL);
+        applyCommands(0, 1);
     }
 
     print_tecnicofs_tree(stdout, fs);
@@ -220,10 +210,5 @@ int main(int argc, char** argv) {
     double elapsed = ((double)(end - start)/CLOCKS_PER_SEC);
 
     printf("\nTecnicoFS completed in %.04f seconds.\n", elapsed);
-
-    free(ERR_MSG.USAGE_ARGS_FMT);
-    free(ERR_MSG.BAD_ARGS);
-    free(ERR_MSG.BAD_CMD);
-    free(ERR_MSG.IO_ERR);
     exit(EXIT_SUCCESS);
 }
