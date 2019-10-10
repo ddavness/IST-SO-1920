@@ -5,8 +5,6 @@
 
 */
 
-#include <stdbool.h>
-
 #ifndef COLORTXT
 #define COLORTXT
 

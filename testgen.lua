@@ -10,16 +10,20 @@
 
 local FILE_HITRATE = 60
 
-local charset = {
+local CHARSET = {
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
     '-', '_', '.',
-    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+
+    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
 }
 
 local namesInTree = {}
 
-function makeFName()
+local function makeFName()
     if (math.random(1, 100) < FILE_HITRATE) and (#namesInTree ~= 0) then
         return namesInTree[math.random(1, #namesInTree)]
     end
@@ -27,8 +31,8 @@ function makeFName()
     local length = math.random(1, 90)
     local name = ""
 
-    for i = 1, length do
-        name = name .. charset[math.random(1, #charset)]
+    for _ = 1, length do
+        name = name .. CHARSET[math.random(1, #CHARSET)]
     end
 
     if name == "." or name == ".." then
@@ -63,7 +67,7 @@ for _,char in pairs({'c', 'l', 'd'}) do
     end
     if m > 0 then
         cmdset = cmdset..char
-        for i = 1, m do
+        for _ = 1, m do
             table.insert(cmds, char)
         end
     end

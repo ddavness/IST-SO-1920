@@ -8,7 +8,7 @@
 #ifndef VOID
 #define VOID
 
-void void_1arg(void*);
-void void_2arg(void*, void*);
+void void_func(void*);
+void void_noarg();
 
 #endif

@@ -7,5 +7,5 @@
 
 #include "void.h"
 
-void void_1arg(__attribute__ ((unused)) void* _) {}
-void void_2arg(__attribute__ ((unused)) void* _, __attribute__ ((unused)) void* __) {}
+void void_func(__attribute__ ((unused)) void* _) {}
+void void_noarg() {}

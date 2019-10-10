@@ -6,6 +6,7 @@ vgcore.*
 # Binary executables and object code - they're useless for the delivery!
 tecnicofs-*
 *.o
+*.zip
 
 # Editor settings
 .vscode
