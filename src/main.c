@@ -110,22 +110,15 @@ int insertCommand(char* data) {
     return 0;
 }
 
-void errorParse(char token, char* name){
-    fprintf(stderr, "%s %c %s\n", yellow("Error: Invalid Command!"), token, name);
+void emitParseError(char* cmd){
+    fprintf(stderr, "%s %s", yellow("Error! Invalid Command:"), cmd);
 }
 
-void processInput(char* input){
+void processInput(FILE* input){
     char line[MAX_INPUT_SIZE];
-    FILE* file = fopen(input, "r");
     int errs = 0;
 
-    if (!file) {
-        fprintf(stderr, red_bold("Unable to open file '%s'!"), input);
-        perror("\nError");
-        exit(EXIT_FAILURE);
-    }
-
-    while (fgets(line, sizeof(line)/sizeof(char), file)) {
+    while (fgets(line, sizeof(line)/sizeof(char), input)) {
         char token;
         char name[MAX_INPUT_SIZE];
 
@@ -140,7 +133,7 @@ void processInput(char* input){
             case 'l':
             case 'd':
                 if(numTokens != 2){
-                    errorParse(token, name);
+                    emitParseError(line);
                     errs++;
                 }
                 if(insertCommand(line))
@@ -148,19 +141,16 @@ void processInput(char* input){
             case '#':
                 break;
             default: { /* error */
-                errorParse(token, name);
+                emitParseError(line);
                 errs++;
             }
         }
     }
 
     if (errs != 0) {
-        fprintf(stderr, red_bold("Exiting\n"));
+        fprintf(stderr, red_bold("\nParsing failure.\n"));
         exit(EXIT_FAILURE);
     }
-
-    // Do not forget to close the file!
-    fclose(file);
 }
 
 void applyCommands(){
@@ -178,7 +168,7 @@ void applyCommands(){
         char name[MAX_INPUT_SIZE];
         int numTokens = sscanf(command, "%c %s", &token, name);
         if (numTokens != 2) {
-            fprintf(stderr, "%s %c %s", red_bold("Error: Invalid command in Queue:\n"), token, name);
+            fprintf(stderr, "%s %s\n", red_bold("Error! Invalid command in Queue:"), command);
             exit(EXIT_FAILURE);
         }
 
@@ -193,6 +183,7 @@ void applyCommands(){
                 LOCK_WRITE(&FS_LOCK);
                 create(fs, name, iNumber);
                 LOCK_UNLOCK(&FS_LOCK);
+
                 break;
             case 'l':
                 LOCK_READ(&FS_LOCK);
@@ -210,23 +201,29 @@ void applyCommands(){
                 LOCK_WRITE(&FS_LOCK);
                 delete(fs, name);
                 LOCK_UNLOCK(&FS_LOCK);
+
                 break;
             default: { /* error */
-                fprintf(stderr, "%s %c %s", red_bold("Error: Invalid command in Queue:\n"), token, name);
+                fprintf(stderr, "%s %s\n", red_bold("Error! Invalid command in Queue:"), command);
                 exit(EXIT_FAILURE);
             }
         }
     }
 }
 
-void* applyCommandsLauncher(__attribute__ ((unused)) void* argv) {
+/*
+    Redirects a thread to applyCommands() without having to
+    deal with compiler warnings about wrong function types.
+*/
+
+void* applyCommandsLauncher(__attribute__ ((unused)) void* _) {
     applyCommands();
 
     pthread_exit(NULL);
     return NULL;
 }
 
-void deploy(char** argv) {
+void deploy() {
     if (NOSYNC) {
         // No need to apply any sort of commands, just run applyCommands-as-is
         applyCommands();
@@ -255,26 +252,36 @@ void deploy(char** argv) {
 int main(int argc, char** argv) {
     parseArgs(argc, argv);
 
+    // Try to open the input file, so that we can catch the error early!
+    // Possible errors when opening the file: No such directory, Access denied
+    FILE* cmds = fopen(argv[1], "r");
+    if (!cmds) {
+        fprintf(stderr, red_bold("Unable to open file '%s'!"), argv[2]);
+        perror("\nError");
+        exit(EXIT_FAILURE);
+    }
+
     // Try to open the output file, so that we can catch the error early!
     // Possible errors when opening/creating the file: Access denied
-    FILE* output = fopen(argv[2], "w");
-    if (!output) {
+    FILE* out = fopen(argv[2], "w");
+    if (!out) {
         fprintf(stderr, red_bold("Unable to open file '%s'!"), argv[2]);
         perror("\nError");
         exit(EXIT_FAILURE);
     }
 
     struct timespec start, end;
-    processInput(argv[1]);
+    processInput(cmds);
+    fclose(cmds);
 
     // This time getting approach was found on https://stackoverflow.com/a/10192994
     clock_gettime(CLOCK_MONOTONIC, &start);
     fs = new_tecnicofs();
 
-    deploy(argv);
+    deploy();
 
-    print_tecnicofs_tree(output, fs);
-    fclose(output);
+    print_tecnicofs_tree(out, fs);
+    fclose(out);
 
     free_tecnicofs(fs);
     clock_gettime(CLOCK_MONOTONIC, &end);
