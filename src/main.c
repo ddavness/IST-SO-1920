@@ -1,3 +1,16 @@
+/*
+
+    File: main.c
+    Description: Main entry point for the project
+
+    Group 84 (LEIC-T)
+    Authors: David Duque (93698);
+             Filipe Ferro (70611)
+
+    First project, Sistemas Operativos, IST/UL, 2019/20
+
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
@@ -215,7 +228,6 @@ void applyCommands(){
     Redirects a thread to applyCommands() without having to
     deal with compiler warnings about wrong function types.
 */
-
 void* applyCommandsLauncher(__attribute__ ((unused)) void* _) {
     applyCommands();
 
@@ -288,6 +300,6 @@ int main(int argc, char** argv) {
 
     double elapsed = (((double)(end.tv_nsec - start.tv_nsec)) / 1000000000.0) + ((double)(end.tv_sec - start.tv_sec));
 
-    fprintf(stderr, green_bold("\nTecnicoFS completed in %.04f seconds.\n"), elapsed);
+    fprintf(stderr, green_bold("TecnicoFS completed in %.04f seconds.\n"), elapsed);
     exit(EXIT_SUCCESS);
 }

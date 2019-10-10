@@ -1,5 +1,8 @@
-# Makefile, versao 1
+# Makefile, v1
 # Sistemas Operativos, DEI/IST/ULisboa 2019-20
+#
+# By: David Duque, 93698
+# By: Filipe Ferro, 70611
 
 CC = gcc
 LD = gcc
@@ -12,9 +15,10 @@ LDFLAGS= -lm -pthread
 
 # A phony target is one that is not really the name of a file
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
-.PHONY: all clean run remake nosync
+.PHONY: all clean remake
 
 all: tecnicofs-nosync tecnicofs-mutex tecnicofs-rwlock
+	@echo -e "\x1b[1;92mDone!\x1b[0m"
 
 # Final Program set
 
