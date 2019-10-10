@@ -167,18 +167,20 @@ void processInput(FILE* input){
 }
 
 void applyCommands(){
+    char token;
+    char name[MAX_INPUT_SIZE];
+
     while (numberCommands > 0) {
         LOCK_WRITE(&CMD_LOCK);
         const char* command = removeCommand();
         if (command == NULL){
-            break;
-        } else if ((command[0] == 'l' || command[0] == 'd') && command[1] == ' ') {
+            LOCK_UNLOCK(&CMD_LOCK);
+            return;
+        } else if (command[0] != 'c' && command[1] == ' ') {
             // Unlock early if the command doesn't require a new iNumber!
             LOCK_UNLOCK(&CMD_LOCK);
         }
 
-        char token;
-        char name[MAX_INPUT_SIZE];
         int numTokens = sscanf(command, "%c %s", &token, name);
         if (numTokens != 2) {
             fprintf(stderr, "%s %s\n", red_bold("Error! Invalid command in Queue:"), command);
@@ -268,7 +270,7 @@ int main(int argc, char** argv) {
     // Possible errors when opening the file: No such directory, Access denied
     FILE* cmds = fopen(argv[1], "r");
     if (!cmds) {
-        fprintf(stderr, red_bold("Unable to open file '%s'!"), argv[2]);
+        fprintf(stderr, red_bold("Unable to open file '%s'!"), argv[1]);
         perror("\nError");
         exit(EXIT_FAILURE);
     }
