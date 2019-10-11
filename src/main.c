@@ -91,11 +91,11 @@ static void parseArgs (long argc, char** const argv){
 
     if (NOSYNC) {
         // Display a warn if a thread argument was passed (and it is different than 1)
-        if (argv[3] && (argv[3][0] != '1' || argv[3][1] != '\0')) {
+        if (argc == 4 && (argv[3][0] != '1' || argv[3][1] != '\0')) {
             fprintf(stderr, yellow_bold("This program is ran in no-sync mode (sequentially), which means that it only runs one thread.\n"));
         }
     } else {
-        // Validates the number of threads
+        // Validates the number of threads, if in MT mode
         int threads = atoi(argv[3]);
         if (threads < 1) {
             fprintf(stderr, "%s\n%s %s\n", red_bold("Invalid number of threads!"), red("Expected a positive integer, got"), argv[3]);
@@ -266,7 +266,7 @@ void deploy_threads() {
 int main(int argc, char** argv) {
     parseArgs(argc, argv);
 
-    // Try to open the input file, so that we can catch the error early!
+    // Try to open the input file.
     // Possible errors when opening the file: No such directory, Access denied
     FILE* cmds = fopen(argv[1], "r");
     if (!cmds) {
@@ -274,8 +274,7 @@ int main(int argc, char** argv) {
         perror("\nError");
         exit(EXIT_FAILURE);
     }
-
-    // Try to open the output file, so that we can catch the error early!
+    // Try to open the output file.
     // Possible errors when opening/creating the file: Access denied
     FILE* out = fopen(argv[2], "w");
     if (!out) {
