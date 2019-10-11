@@ -237,7 +237,7 @@ void* applyCommandsLauncher(__attribute__ ((unused)) void* _) {
     return NULL;
 }
 
-void deploy() {
+void deploy_threads() {
     if (NOSYNC) {
         // No need to apply any sort of commands, just run applyCommands-as-is
         applyCommands();
@@ -284,23 +284,23 @@ int main(int argc, char** argv) {
         exit(EXIT_FAILURE);
     }
 
-    struct timespec start, end;
+    struct timeval start, end;
     processInput(cmds);
     fclose(cmds);
 
     // This time getting approach was found on https://stackoverflow.com/a/10192994
-    clock_gettime(CLOCK_MONOTONIC, &start);
     fs = new_tecnicofs();
 
-    deploy();
+    gettimeofday(&start, NULL);
+    deploy_threads();
 
     print_tecnicofs_tree(out, fs);
     fclose(out);
 
     free_tecnicofs(fs);
-    clock_gettime(CLOCK_MONOTONIC, &end);
+    gettimeofday(&end, NULL);
 
-    double elapsed = (((double)(end.tv_nsec - start.tv_nsec)) / 1000000000.0) + ((double)(end.tv_sec - start.tv_sec));
+    double elapsed = (((double)(end.tv_usec - start.tv_usec)) / 1000000.0) + ((double)(end.tv_sec - start.tv_sec));
 
     fprintf(stderr, green_bold("TecnicoFS completed in %.04f seconds.\n"), elapsed);
     exit(EXIT_SUCCESS);

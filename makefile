@@ -18,7 +18,6 @@ LDFLAGS= -lm -pthread
 .PHONY: all clean remake
 
 all: tecnicofs-nosync tecnicofs-mutex tecnicofs-rwlock
-	@echo -e "\x1b[1;92mDone!\x1b[0m"
 
 # Final Program set
 

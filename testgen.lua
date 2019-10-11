@@ -8,7 +8,7 @@
 
 --]]
 
-local FILE_HITRATE = 60
+local FILE_HITRATE = 35
 
 local CHARSET = {
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
@@ -23,9 +23,17 @@ local CHARSET = {
 
 local namesInTree = {}
 
-local function makeFName()
+local function makeFName(cmd)
     if (math.random(1, 100) < FILE_HITRATE) and (#namesInTree ~= 0) then
-        return namesInTree[math.random(1, #namesInTree)]
+        local i = math.random(1, #namesInTree)
+        local fileExists = namesInTree[i][2]
+        if (fileExists and cmd == "c") or (not fileExists and cmd == "d") then
+            -- Don't create files already created!
+            return makeFName(cmd)
+        end
+
+        namesInTree[i][2] = cmd == "c" and true or cmd == "d" and false or namesInTree[i][2]
+        return namesInTree[i][1]
     end
 
     local length = math.random(1, 90)
@@ -37,9 +45,9 @@ local function makeFName()
 
     if name == "." or name == ".." then
         -- I don't think we can actually have files that are only dots
-        return makeFName()
+        return makeFName(cmd)
     else
-        namesInTree[#namesInTree + 1] = name
+        namesInTree[#namesInTree + 1] = {name, cmd == "c"}
         return name
     end
 end
@@ -86,7 +94,8 @@ io.write("# Contains "..tostring(n).." commands.\n")
 local lastTime = os.time()
 
 for i = 1, n do
-    io.write(cmds[math.random(1, #cmds)].." "..makeFName().."\n")
+    local cmd = cmds[math.random(1, #cmds)]
+    io.write(cmd.." "..makeFName(cmd).."\n")
 
     if not (os.time() - lastTime == 0) then
         lastTime = os.time()
