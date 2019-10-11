@@ -79,7 +79,7 @@ int numberCommands = 0;
 int numberThreads = 0;
 tecnicofs* fs;
 
-static void parseArgs (long argc, char** const argv){
+static void parseArgs (int argc, char** const argv){
     // For the nosync edition, we are allowing the last argument
     // (num_threads) to be ommitted, since it's redundant
 
