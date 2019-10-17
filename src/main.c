@@ -81,7 +81,7 @@ tecnicofs* fs;
 
 static void parseArgs (int argc, char** const argv){
     // For the nosync edition, we are allowing the last argument
-    // (num_threads) to be ommitted, since it's redundant
+    // (num_threads) to be omitted, since it's redundant
 
     if ((NOSYNC && argc != 4 && argc != 3) || (!NOSYNC && argc != 4)) {
         fprintf(stderr, red_bold("Invalid format!\n"));
