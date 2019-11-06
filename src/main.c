@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <wait.h>
 #include <pthread.h>
+#include <semaphore.h>
 #include <sys/types.h>
 #include <sys/time.h>
 
@@ -35,11 +36,13 @@
 char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
 int headQueue = 0;
 int numberCommands = 0;
+sem_t cmdSemaphore;
+pthread_mutex_t cmdlock;
 
 int numberThreads = 0;
 int numberBuckets = 0;
+
 tecnicofs fs;
-lock cmdlock;
 
 static void parseArgs (int argc, char** const argv){
     // For the nosync edition, we are allowing the two last arguments
@@ -145,14 +148,14 @@ void* applyCommands(){
     char name[MAX_INPUT_SIZE];
 
     while (true) {
-        LOCK_WRITE(&cmdlock);
+        mutex_lock(&cmdlock);
         const char* command = removeCommand();
         if (command == NULL){
-            LOCK_UNLOCK(&cmdlock);
+            mutex_unlock(&cmdlock);
             return NULL;
         } else if (command[0] != 'c' && command[1] == ' ') {
             // Unlock early if the command doesn't require a new iNumber!
-            LOCK_UNLOCK(&cmdlock);
+            mutex_unlock(&cmdlock);
         }
 
         int numTokens = sscanf(command, "%c %s", &token, name);
@@ -168,7 +171,7 @@ void* applyCommands(){
             case 'c':
                 // We're now unlocking because we've got the iNumber!
                 iNumber = obtainNewInumber(&fs);
-                LOCK_UNLOCK(&cmdlock);
+                mutex_unlock(&cmdlock);
 
                 LOCK_WRITE(fslock);
                 create(fs, name, iNumber);
@@ -204,29 +207,28 @@ void* applyCommands(){
 }
 
 void deploy_threads() {
-    if (NOSYNC) {
-        // No need to apply any sort of commands, just run applyCommands-as-is
-        applyCommands();
-    } else {
-        // Initialize the IO lock and local thread pool.
-        INIT_LOCK(&cmdlock);
-        pthread_t threadPool[numberThreads];
+    // Initialize the IO lock and local thread pool.
+    mutex_init(&cmdlock);
+    pthread_t threadPool[numberThreads];
 
-        for (int i = 0; i < numberThreads; i++) {
-            if (pthread_create(&threadPool[i], NULL, applyCommands, NULL)) {
-                fprintf(stderr, red_bold("Failed to spawn the thread %d/%d!"), i, numberThreads);
-                perror("\nError");
-                exit(EXIT_FAILURE);
-            }
+    for (int i = 0; i < numberThreads; i++) {
+        if (pthread_create(&threadPool[i], NULL, applyCommands, NULL)) {
+            fprintf(stderr, red_bold("Failed to spawn the thread %d/%d!"), i, numberThreads);
+            perror("\nError");
+            exit(EXIT_FAILURE);
         }
-
-        // Wait until every thread is done.
-        for (int i = 0; i < numberThreads; i++) {
-            pthread_join(threadPool[i], NULL);
-        }
-
-        DESTROY_LOCK(&cmdlock);
     }
+
+    // Wait until every thread is done.
+    for (int i = 0; i < numberThreads; i++) {
+        if (pthread_join(threadPool[i], NULL)) {
+            fprintf(stderr, red_bold("Failed to join thread %d/%d!"), i, numberThreads);
+            perror("\nError");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    mutex_destroy(&cmdlock);
 }
 
 int main(int argc, char** argv) {
