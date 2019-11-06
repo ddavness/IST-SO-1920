@@ -7,8 +7,8 @@
 #include "lib/hash.h"
 #include "lib/locks.h"
 
-int obtainNewInumber(tecnicofs fs) {
-    int newInumber = ++(fs.nextINumber);
+int obtainNewInumber(tecnicofs* fs) {
+    int newInumber = ++(fs -> nextINumber);
     return newInumber;
 }
 
@@ -31,13 +31,10 @@ tecnicofs new_tecnicofs(int buckets){
         INIT_LOCK(bucket -> sync_lock);
     }
 
-    fprintf(stderr, "We didn't die yet.\n");
-
     return root;
 }
 
 void free_tecnicofs(tecnicofs root){
-    fprintf(stderr, "Freeing...\n");
     tecnicofs_node* fs = root.fs;
     for (int i = 0; i < root.numBuckets; i++) {
         tecnicofs_node* fsnode = fs + i;

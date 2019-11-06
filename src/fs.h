@@ -14,7 +14,7 @@ typedef struct tecnicofs {
     int nextINumber;
 } tecnicofs;
 
-int obtainNewInumber(tecnicofs);
+int obtainNewInumber(tecnicofs*);
 tecnicofs new_tecnicofs(int);
 void free_tecnicofs(tecnicofs);
 void create(tecnicofs, char*, int);

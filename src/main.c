@@ -167,7 +167,7 @@ void* applyCommands(){
         switch (token) {
             case 'c':
                 // We're now unlocking because we've got the iNumber!
-                iNumber = obtainNewInumber(fs);
+                iNumber = obtainNewInumber(&fs);
                 LOCK_UNLOCK(&cmdlock);
 
                 LOCK_WRITE(fslock);
