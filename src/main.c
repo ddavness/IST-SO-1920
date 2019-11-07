@@ -35,7 +35,6 @@
 #define MAX_INPUT_SIZE 100
 
 char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
-int numberCommands = 0;
 
 int headQueue = 0;
 int feedQueue = 0;
@@ -88,17 +87,9 @@ static void parseArgs (int argc, char** const argv){
 }
 
 int insertCommand(char* data) {
-    if(numberCommands != MAX_COMMANDS) {
-        numberCommands++;
-
-        strcpy(inputCommands[feedQueue], data);
-        feedQueue = (feedQueue + 1) % MAX_COMMANDS;
-        return 0;
-    }
-
-    // This in shouldn't happen mid-execution if synchronization was done right
-    // (Only in final cleanup, maybe)
-    return 1;
+    strcpy(inputCommands[feedQueue], data);
+    feedQueue = (feedQueue + 1) % MAX_COMMANDS;
+    return 0;
 }
 
 void emitParseError(char* cmd){
@@ -184,16 +175,9 @@ void feedInput(FILE* input){
 }
 
 char* removeCommand() {
-    if(numberCommands > 0){
-        numberCommands--;
-
-        char* cmd = inputCommands[headQueue];
-        headQueue = (headQueue + 1) % MAX_COMMANDS;
-        return cmd;
-    }
-
-    // This should NOT happen
-    return NULL;
+    char* cmd = inputCommands[headQueue];
+    headQueue = (headQueue + 1) % MAX_COMMANDS;
+    return cmd;
 }
 
 void* applyCommands(){
@@ -216,10 +200,6 @@ void* applyCommands(){
             /* Allow the command to be replaced */
 
             return NULL;
-        } else if (command[0] != 'c' && command[1] == ' ') {
-            // Unlock early if the command doesn't require a new iNumber!
-            mutex_unlock(&cmdlock);
-            errWrap(sem_post(&cmdFeed), "Could not post on semaphore!");
         }
 
         int numTokens = sscanf(command, "%c %s %s", &token, name, targ);
@@ -244,6 +224,9 @@ void* applyCommands(){
 
                 break;
             case 'l':
+                mutex_unlock(&cmdlock);
+                errWrap(sem_post(&cmdFeed), "Could not post on semaphore!");
+
                 LOCK_READ(fslock);
                 searchResult = lookup(fs, name);
 
@@ -256,14 +239,23 @@ void* applyCommands(){
 
                 break;
             case 'd':
+                mutex_unlock(&cmdlock);
+                errWrap(sem_post(&cmdFeed), "Could not post on semaphore!");
+
                 LOCK_WRITE(fslock);
                 delete(fs, name);
                 LOCK_UNLOCK(fslock);
 
                 break;
             case 'r':
+                mutex_unlock(&cmdlock);
+                errWrap(sem_post(&cmdFeed), "Could not post on semaphore!");
+
                 break; // Silent Error 501 Not Implemented (yet)
             default: {
+                mutex_unlock(&cmdlock);
+                errWrap(sem_post(&cmdFeed), "Could not post on semaphore!");
+
                 fprintf(stderr, "%s %s\n", red_bold("Error! Invalid command in Queue:"), command);
                 exit(EXIT_FAILURE);
             }
