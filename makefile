@@ -21,14 +21,14 @@ all: tecnicofs-nosync tecnicofs-mutex tecnicofs-rwlock
 
 # Final Program set
 
-tecnicofs-nosync: out/bst.o out/locks.o out/void.o out/fs-nosync.o out/hash.o out/main-nosync.o
-	$(LD) $(CFLAGS) $(LDFLAGS) -o tecnicofs-nosync out/bst.o out/void.o out/fs-nosync.o out/locks.o out/hash.o out/main-nosync.o
+tecnicofs-nosync: out/bst.o out/err.o out/locks.o out/void.o out/fs-nosync.o out/hash.o out/main-nosync.o
+	$(LD) $(CFLAGS) $(LDFLAGS) -o tecnicofs-nosync out/bst.o out/err.o out/void.o out/fs-nosync.o out/locks.o out/hash.o out/main-nosync.o
 
-tecnicofs-mutex: out/bst.o out/locks.o out/void.o out/fs-mutex.o out/hash.o out/main-mutex.o
-	$(LD) $(CFLAGS) $(LDFLAGS) -o tecnicofs-mutex out/bst.o out/void.o out/fs-mutex.o out/locks.o out/hash.o out/main-mutex.o
+tecnicofs-mutex: out/bst.o out/err.o out/locks.o out/void.o out/fs-mutex.o out/hash.o out/main-mutex.o
+	$(LD) $(CFLAGS) $(LDFLAGS) -o tecnicofs-mutex out/bst.o out/err.o out/void.o out/fs-mutex.o out/locks.o out/hash.o out/main-mutex.o
 
-tecnicofs-rwlock: out/bst.o out/locks.o out/void.o out/fs-rwlock.o out/hash.o out/main-rwlock.o
-	$(LD) $(CFLAGS) $(LDFLAGS) -o tecnicofs-rwlock out/bst.o out/void.o out/fs-rwlock.o out/locks.o out/hash.o out/main-rwlock.o
+tecnicofs-rwlock: out/bst.o out/err.o out/locks.o out/void.o out/fs-rwlock.o out/hash.o out/main-rwlock.o
+	$(LD) $(CFLAGS) $(LDFLAGS) -o tecnicofs-rwlock out/bst.o out/err.o out/void.o out/fs-rwlock.o out/locks.o out/hash.o out/main-rwlock.o
 
 # Main variations (Nosync, Mutex, RWLock)
 
@@ -40,6 +40,18 @@ out/main-mutex.o: src/main.c src/fs.h src/lib/bst.h src/lib/color.h src/lib/lock
 
 out/main-rwlock.o: src/main.c src/fs.h src/lib/bst.h src/lib/color.h src/lib/locks.h src/lib/void.h
 	$(CC) $(CFLAGS) -DRWLOCK -o out/main-rwlock.o -c src/main.c
+
+# Sync variations
+
+out/fs-nosync.o: src/fs.c src/fs.h src/lib/bst.h
+	$(CC) $(CFLAGS) -o out/fs-nosync.o -c src/fs.c
+
+out/fs-mutex.o: src/fs.c src/fs.h src/lib/bst.h
+	$(CC) $(CFLAGS) -DMUTEX -o out/fs-mutex.o -c src/fs.c
+
+out/fs-rwlock.o: src/fs.c src/fs.h src/lib/bst.h
+	$(CC) $(CFLAGS) -DRWLOCK -o out/fs-rwlock.o -c src/fs.c
+
 
 # Dependencies
 
@@ -55,14 +67,8 @@ out/void.o: src/lib/void.c src/lib/void.h
 out/bst.o: src/lib/bst.c src/lib/bst.h
 	$(CC) $(CFLAGS) -o out/bst.o -c src/lib/bst.c
 
-out/fs-nosync.o: src/fs.c src/fs.h src/lib/bst.h
-	$(CC) $(CFLAGS) -o out/fs-nosync.o -c src/fs.c
-
-out/fs-mutex.o: src/fs.c src/fs.h src/lib/bst.h
-	$(CC) $(CFLAGS) -DMUTEX -o out/fs-mutex.o -c src/fs.c
-
-out/fs-rwlock.o: src/fs.c src/fs.h src/lib/bst.h
-	$(CC) $(CFLAGS) -DRWLOCK -o out/fs-rwlock.o -c src/fs.c
+out/err.o: src/lib/err.c src/lib/err.h
+	$(CC) $(CFLAGS) -o out/err.o -c src/lib/err.c
 
 # Misc
 

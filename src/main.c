@@ -26,18 +26,21 @@
 #include <sys/time.h>
 
 #include "lib/color.h"
+#include "lib/err.h"
 #include "lib/locks.h"
 #include "lib/void.h"
 #include "fs.h"
 
-#define MAX_COMMANDS 150000
+#define MAX_COMMANDS 10
 #define MAX_INPUT_SIZE 100
 
 char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
-int headQueue = 0;
 int numberCommands = 0;
-sem_t cmdSemaphore;
-pthread_mutex_t cmdlock;
+
+int headQueue = 0;
+int feedQueue = 0;
+sem_t cmdFeed, cmdBuff;
+pthread_mutex_t cmdlock, feedlock;
 
 int numberThreads = 0;
 int numberBuckets = 0;
@@ -84,31 +87,37 @@ static void parseArgs (int argc, char** const argv){
     }
 }
 
-char* removeCommand() {
-    if(numberCommands > 0){
-        numberCommands--;
-        return inputCommands[headQueue++];  
-    }
-    return NULL;
-}
-
 int insertCommand(char* data) {
     if(numberCommands != MAX_COMMANDS) {
-        strcpy(inputCommands[numberCommands++], data);
-        return 1;
+        numberCommands++;
+
+        strcpy(inputCommands[feedQueue], data);
+        feedQueue = (feedQueue + 1) % MAX_COMMANDS;
+        return 0;
     }
-    return 0;
+
+    // This in shouldn't happen mid-execution if synchronization was done right
+    // (Only in final cleanup, maybe)
+    return 1;
 }
 
 void emitParseError(char* cmd){
-    fprintf(stderr, "%s %s", yellow("Error! Invalid Command:"), cmd);
+    fprintf(stderr, "%s '%s'", yellow("Error! Invalid Command:"), cmd);
+    fprintf(stderr, red_bold("\nParsing failure!\n"));
+    exit(EXIT_FAILURE);
 }
 
-void processInput(FILE* input){
+void feedInput(FILE* input){
     char line[MAX_INPUT_SIZE];
     int errs = 0;
 
     while (fgets(line, sizeof(line)/sizeof(char), input)) {
+        bool lineAdded = false;
+
+        // Wait until the command can be replaced
+        errWrap(sem_wait(&cmdFeed), "Error while waiting for the semaphore!");
+        mutex_lock(&feedlock);
+
         char token;
         char name[MAX_INPUT_SIZE];
 
@@ -122,45 +131,100 @@ void processInput(FILE* input){
             case 'c':
             case 'l':
             case 'd':
-                if(numTokens != 2){
+                if (numTokens != 2) {
+                    break;
+                }
+                if (insertCommand(line)) {
+                    // TODO: Panic, not too sure what to do here?...
+                    fprintf(stderr, "Panic!\n");
+                }
+                lineAdded = true;
+                break;
+            case 'r':
+                if (numTokens != 3){
                     emitParseError(line);
                     errs++;
                 }
-                if(insertCommand(line))
-                    break;
+                if (insertCommand(line)) {
+                    // TODO: Panic, not too sure what to do here?...
+                    fprintf(stderr, "Panic!\n");
+                }
+                lineAdded = true;
+                break;
             case '#':
                 break;
             default: { /* error */
                 emitParseError(line);
                 errs++;
+                break;
             }
+        }
+
+        mutex_unlock(&feedlock);
+        // Signal that the command can be consumed
+        if (lineAdded) {
+            errWrap(sem_post(&cmdBuff), "Could not post on semaphore!");
         }
     }
 
-    if (errs != 0) {
-        fprintf(stderr, red_bold("\nParsing failure.\n"));
-        exit(EXIT_FAILURE);
+    for (int i = 0; i < numberThreads; i++) {
+        // Produce exit commands (defined as empty strings or null terminators)
+        printf("Hi lol\n");
+
+        // Wait until the command can be replaced
+        errWrap(sem_wait(&cmdFeed), "Error while waiting for the semaphore!");
+        mutex_lock(&feedlock);
+
+        insertCommand("x");
+
+        mutex_unlock(&feedlock);
+        errWrap(sem_post(&cmdBuff), "Could not post on semaphore!");
+        // Signal that the command can be consumed
     }
+}
+
+char* removeCommand() {
+    if(numberCommands > 0){
+        numberCommands--;
+
+        char* cmd = inputCommands[headQueue];
+        headQueue = (headQueue + 1) % MAX_COMMANDS;
+        return cmd;
+    }
+
+    // This should NOT happen
+    return NULL;
 }
 
 void* applyCommands(){
     char token;
     char name[MAX_INPUT_SIZE];
+    char targ[MAX_INPUT_SIZE];
 
     while (true) {
+        // Wait until a command can be consumed
+        errWrap(sem_wait(&cmdBuff), "Error while waiting for the semaphore!");
         mutex_lock(&cmdlock);
+
         const char* command = removeCommand();
         if (command == NULL){
+            fprintf(stderr, red_bold("Found null command in queue!\n"));
+            exit(EXIT_FAILURE);
+        } else if (command[0] == 'x') {
             mutex_unlock(&cmdlock);
+            errWrap(sem_post(&cmdFeed), "Could not post on semaphore!");
+            /* Allow the command to be replaced */
+
             return NULL;
         } else if (command[0] != 'c' && command[1] == ' ') {
             // Unlock early if the command doesn't require a new iNumber!
             mutex_unlock(&cmdlock);
+            errWrap(sem_post(&cmdFeed), "Could not post on semaphore!");
         }
 
-        int numTokens = sscanf(command, "%c %s", &token, name);
-        if (numTokens != 2) {
-            fprintf(stderr, "%s %s\n", red_bold("Error! Invalid command in Queue:"), command);
+        int numTokens = sscanf(command, "%c %s %s", &token, name, targ);
+        if (numTokens != 3 && numTokens != 2) {
+            fprintf(stderr, "%s '%s'\n", red_bold("Error! Invalid command in Queue:"), command);
             exit(EXIT_FAILURE);
         }
 
@@ -172,6 +236,7 @@ void* applyCommands(){
                 // We're now unlocking because we've got the iNumber!
                 iNumber = obtainNewInumber(&fs);
                 mutex_unlock(&cmdlock);
+                errWrap(sem_post(&cmdFeed), "Could not post on semaphore!");
 
                 LOCK_WRITE(fslock);
                 create(fs, name, iNumber);
@@ -196,7 +261,9 @@ void* applyCommands(){
                 LOCK_UNLOCK(fslock);
 
                 break;
-            default: { /* error */
+            case 'r':
+                break; // Silent Error 501 Not Implemented (yet)
+            default: {
                 fprintf(stderr, "%s %s\n", red_bold("Error! Invalid command in Queue:"), command);
                 exit(EXIT_FAILURE);
             }
@@ -206,26 +273,24 @@ void* applyCommands(){
     return NULL;
 }
 
-void deploy_threads() {
+void deploy_threads(FILE* cmds) {
     // Initialize the IO lock and local thread pool.
+    errWrap(sem_init(&cmdFeed, 0, MAX_COMMANDS), "Unable to initialize feeder semaphore!");
+    errWrap(sem_init(&cmdBuff, 0, 0), "Unable to initialize buffer semaphore!");
+
     mutex_init(&cmdlock);
     pthread_t threadPool[numberThreads];
 
     for (int i = 0; i < numberThreads; i++) {
-        if (pthread_create(&threadPool[i], NULL, applyCommands, NULL)) {
-            fprintf(stderr, red_bold("Failed to spawn the thread %d/%d!"), i, numberThreads);
-            perror("\nError");
-            exit(EXIT_FAILURE);
-        }
+        errWrap(pthread_create(&threadPool[i], NULL, applyCommands, NULL), "Failed to spawn thread!");
     }
+
+    // Carry on, feed the buffer
+    feedInput(cmds);
 
     // Wait until every thread is done.
     for (int i = 0; i < numberThreads; i++) {
-        if (pthread_join(threadPool[i], NULL)) {
-            fprintf(stderr, red_bold("Failed to join thread %d/%d!"), i, numberThreads);
-            perror("\nError");
-            exit(EXIT_FAILURE);
-        }
+        errWrap(pthread_join(threadPool[i], NULL), "Failed to join thread!");
     }
 
     mutex_destroy(&cmdlock);
@@ -252,17 +317,16 @@ int main(int argc, char** argv) {
     }
 
     struct timeval start, end;
-    processInput(cmds);
-    fclose(cmds);
 
     // This time getting approach was found on https://stackoverflow.com/a/10192994
     fs = new_tecnicofs(numberBuckets);
 
     gettimeofday(&start, NULL);
-    deploy_threads();
+    deploy_threads(cmds);
 
     print_tecnicofs_tree(out, fs);
     fclose(out);
+    fclose(cmds);
 
     free_tecnicofs(fs);
     gettimeofday(&end, NULL);

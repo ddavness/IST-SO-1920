@@ -12,14 +12,7 @@
 
 #include "color.h"
 #include "locks.h"
-
-void errWrap(int errCondition, char* errMsg) {
-    if (errCondition) {
-        fprintf(stderr, red_bold("%s"), errMsg);
-        perror("\nError");
-        exit(EXIT_FAILURE);
-    }
-}
+#include "err.h"
 
 void mutex_init(pthread_mutex_t* mutex) {
     errWrap(pthread_mutex_init(mutex, NULL), "Could not initialize the mutex!");
