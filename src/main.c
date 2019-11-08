@@ -86,10 +86,9 @@ static void parseArgs (int argc, char** const argv){
     }
 }
 
-int insertCommand(char* data) {
+void insertCommand(char* data) {
     strcpy(inputCommands[feedQueue], data);
     feedQueue = (feedQueue + 1) % MAX_COMMANDS;
-    return 0;
 }
 
 void emitParseError(char* cmd){
@@ -109,10 +108,13 @@ void feedInput(FILE* input){
         errWrap(sem_wait(&cmdFeed), "Error while waiting for the semaphore!");
         mutex_lock(&feedlock);
 
+        fprintf(stderr, "Hi!\n");
+
         char token;
         char name[MAX_INPUT_SIZE];
+        char targ[MAX_INPUT_SIZE];
 
-        int numTokens = sscanf(line, "%c %s", &token, name);
+        int numTokens = sscanf(line, "%c %s %s\n", &token, name, targ);
 
         /* perform minimal validation */
         if (numTokens < 1) {
@@ -122,25 +124,19 @@ void feedInput(FILE* input){
             case 'c':
             case 'l':
             case 'd':
-                if (numTokens != 2) {
+                if (numTokens == 2) {
+                    insertCommand(line);
+                    lineAdded = true;
                     break;
+                } else {
+                    continue;
                 }
-                if (insertCommand(line)) {
-                    // TODO: Panic, not too sure what to do here?...
-                    fprintf(stderr, "Panic!\n");
-                }
-                lineAdded = true;
-                break;
             case 'r':
                 if (numTokens != 3){
                     emitParseError(line);
                     errs++;
                 }
-                if (insertCommand(line)) {
-                    // TODO: Panic, not too sure what to do here?...
-                    fprintf(stderr, "Panic!\n");
-                }
-                lineAdded = true;
+                insertCommand(line);
                 break;
             case '#':
                 break;
@@ -159,9 +155,7 @@ void feedInput(FILE* input){
     }
 
     for (int i = 0; i < numberThreads; i++) {
-        // Produce exit commands (defined as empty strings or null terminators)
-        printf("Hi lol\n");
-
+        // Produce exit commands (defined as the 'x' command)
         // Wait until the command can be replaced
         errWrap(sem_wait(&cmdFeed), "Error while waiting for the semaphore!");
         mutex_lock(&feedlock);
@@ -209,6 +203,10 @@ void* applyCommands(){
         }
 
         lock* fslock = get_lock(fs, name);
+        lock* tglock;
+        if (numTokens == 3) {
+            tglock = get_lock(fs, targ);
+        }
         int searchResult;
         int iNumber;
         switch (token) {
@@ -251,7 +249,43 @@ void* applyCommands(){
                 mutex_unlock(&cmdlock);
                 errWrap(sem_post(&cmdFeed), "Could not post on semaphore!");
 
-                break; // Silent Error 501 Not Implemented (yet)
+                if (fslock == tglock) {
+                    // We can simply rename in the tree
+                    LOCK_WRITE(fslock);
+
+                    int originFile = lookup(fs, name);
+                    int targetFile = lookup(fs, targ);
+
+                    if (originFile && !targetFile) {
+                        delete(fs, name);
+                        create(fs, targ, originFile);
+                    }
+
+                    LOCK_UNLOCK(fslock);
+                } else {
+                    if (fslock > tglock) {
+                        // Swap the locks
+                        lock* tmp = fslock;
+                        fslock = tglock;
+                        tglock = tmp;
+                    }
+                    // Lock both threes, delete on origin, create on target
+                    LOCK_WRITE(fslock);
+                    LOCK_WRITE(tglock);
+
+                    int originFile = lookup(fs, name);
+                    int targetFile = lookup(fs, targ);
+
+                    if (originFile && !targetFile) {
+                        delete(fs, name);
+                        create(fs, targ, originFile);
+                    }
+
+                    LOCK_UNLOCK(tglock);
+                    LOCK_UNLOCK(fslock);
+                }
+
+                break;
             default: {
                 mutex_unlock(&cmdlock);
                 errWrap(sem_post(&cmdFeed), "Could not post on semaphore!");

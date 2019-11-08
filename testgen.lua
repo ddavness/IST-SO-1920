@@ -36,7 +36,7 @@ local function makeFName(cmd)
         return namesInTree[i][1]
     end
 
-    local length = math.random(1, 90)
+    local length = math.random(1, 40)
     local name = ""
 
     for _ = 1, length do
@@ -57,8 +57,8 @@ math.randomseed(os.time())
 local n = 0
 
 -- Make sure we have a proper number
-while n <= 0 or n > 150000 do
-    print("Number of commands? (between 0 and 150k)")
+while n <= 0 do
+    print("Number of commands?")
     n = io.read("*n")
 end
 
@@ -67,7 +67,7 @@ local cmdset = ""
 print("Now assign values to each command so that commands with higher values are more common.")
 print("Commands with the value zero won't appear in the test.")
 
-for _,char in pairs({'c', 'l', 'd'}) do
+for _,char in pairs({'c', 'l', 'd', 'r'}) do
     local m = -1
     while m < 0 do
         print("Probability of "..char.."?")
@@ -95,7 +95,11 @@ local lastTime = os.time()
 
 for i = 1, n do
     local cmd = cmds[math.random(1, #cmds)]
-    io.write(cmd.." "..makeFName(cmd).."\n")
+    if cmd == 'r' then
+        io.write(cmd.." "..makeFName('d').." "..makeFName('c').."\n");
+    else
+        io.write(cmd.." "..makeFName(cmd).."\n")
+    end
 
     if not (os.time() - lastTime == 0) then
         lastTime = os.time()
