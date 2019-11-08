@@ -16,6 +16,7 @@
 #include <getopt.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -102,10 +103,10 @@ void feedInput(FILE* input){
     int errs = 0;
 
     while (fgets(line, sizeof(line)/sizeof(char), input)) {
-        bool lineAdded = false;
+        bool lineAdded = true;
 
         // Wait until the command can be replaced
-        errWrap(sem_wait(&cmdFeed), "Error while waiting for the semaphore!");
+        errWrap(sem_wait(&cmdFeed), "Error while waiting for the feeder semaphore!");
 
         char token;
         char name[MAX_INPUT_SIZE];
@@ -123,7 +124,6 @@ void feedInput(FILE* input){
             case 'd':
                 if (numTokens == 2) {
                     insertCommand(line);
-                    lineAdded = true;
                     break;
                 } else {
                     continue;
@@ -136,6 +136,7 @@ void feedInput(FILE* input){
                 insertCommand(line);
                 break;
             case '#':
+                lineAdded = false;
                 break;
             default: { /* error */
                 emitParseError(line);
@@ -146,18 +147,18 @@ void feedInput(FILE* input){
 
         // Signal that the command can be consumed
         if (lineAdded) {
-            errWrap(sem_post(&cmdBuff), "Could not post on semaphore!");
+            errWrap(sem_post(&cmdBuff), "Could not post on buffer semaphore!");
         }
     }
 
     for (int i = 0; i < numberThreads; i++) {
         // Produce exit commands (defined as the 'x' command)
         // Wait until the command can be replaced
-        errWrap(sem_wait(&cmdFeed), "Error while waiting for the semaphore!");
+        errWrap(sem_wait(&cmdFeed), "Error while waiting for the feeder semaphore!");
 
         insertCommand("x");
 
-        errWrap(sem_post(&cmdBuff), "Could not post on semaphore!");
+        errWrap(sem_post(&cmdBuff), "Could not post on buffer semaphore!");
         // Signal that the command can be consumed
     }
 }
@@ -175,7 +176,7 @@ void* applyCommands(){
 
     while (true) {
         // Wait until a command can be consumed
-        errWrap(sem_wait(&cmdBuff), "Error while waiting for the semaphore!");
+        errWrap(sem_wait(&cmdBuff), "Error while waiting for the buffer semaphore!");
         mutex_lock(&cmdlock);
 
         const char* command = removeCommand();
@@ -184,7 +185,7 @@ void* applyCommands(){
             exit(EXIT_FAILURE);
         } else if (command[0] == 'x') {
             mutex_unlock(&cmdlock);
-            errWrap(sem_post(&cmdFeed), "Could not post on semaphore!");
+            errWrap(sem_post(&cmdFeed), "Could not post on feeder semaphore!");
             /* Allow the command to be replaced */
 
             return NULL;
@@ -208,7 +209,7 @@ void* applyCommands(){
                 // We're now unlocking because we've got the iNumber!
                 iNumber = obtainNewInumber(&fs);
                 mutex_unlock(&cmdlock);
-                errWrap(sem_post(&cmdFeed), "Could not post on semaphore!");
+                errWrap(sem_post(&cmdFeed), "Could not post on feeder semaphore!");
 
                 LOCK_WRITE(fslock);
                 create(fs, name, iNumber);
@@ -217,7 +218,7 @@ void* applyCommands(){
                 break;
             case 'l':
                 mutex_unlock(&cmdlock);
-                errWrap(sem_post(&cmdFeed), "Could not post on semaphore!");
+                errWrap(sem_post(&cmdFeed), "Could not post on feeder semaphore!");
 
                 LOCK_READ(fslock);
                 searchResult = lookup(fs, name);
@@ -232,7 +233,7 @@ void* applyCommands(){
                 break;
             case 'd':
                 mutex_unlock(&cmdlock);
-                errWrap(sem_post(&cmdFeed), "Could not post on semaphore!");
+                errWrap(sem_post(&cmdFeed), "Could not post on feeder semaphore!");
 
                 LOCK_WRITE(fslock);
                 delete(fs, name);
@@ -241,7 +242,7 @@ void* applyCommands(){
                 break;
             case 'r':
                 mutex_unlock(&cmdlock);
-                errWrap(sem_post(&cmdFeed), "Could not post on semaphore!");
+                errWrap(sem_post(&cmdFeed), "Could not post on feeder semaphore!");
 
                 if (fslock == tglock) {
                     // We can simply rename in the tree
@@ -257,7 +258,7 @@ void* applyCommands(){
 
                     LOCK_UNLOCK(fslock);
                 } else {
-                    if (fslock > tglock) {
+                    if ((intptr_t)fslock > (intptr_t)tglock) {
                         // Swap the locks
                         lock* tmp = fslock;
                         fslock = tglock;
@@ -282,10 +283,11 @@ void* applyCommands(){
                 break;
             default: {
                 mutex_unlock(&cmdlock);
-                errWrap(sem_post(&cmdFeed), "Could not post on semaphore!");
+                errWrap(sem_post(&cmdFeed), "Could not post on feeder semaphore!");
 
                 fprintf(stderr, "%s %s\n", red_bold("Error! Invalid command in Queue:"), command);
                 exit(EXIT_FAILURE);
+                break;
             }
         }
     }
