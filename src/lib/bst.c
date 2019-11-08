@@ -104,7 +104,7 @@ node* remove_item(node* p, char* key)
             return l;
 
         m = find_min(r);
-        m->right = remove_min(r);        
+        m->right = remove_min(r);
         m->left = l;
 
         return m;
