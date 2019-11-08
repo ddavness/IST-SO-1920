@@ -39,7 +39,7 @@ char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
 int headQueue = 0;
 int feedQueue = 0;
 sem_t cmdFeed, cmdBuff;
-pthread_mutex_t cmdlock, feedlock;
+pthread_mutex_t cmdlock;
 
 int numberThreads = 0;
 int numberBuckets = 0;
@@ -106,9 +106,6 @@ void feedInput(FILE* input){
 
         // Wait until the command can be replaced
         errWrap(sem_wait(&cmdFeed), "Error while waiting for the semaphore!");
-        mutex_lock(&feedlock);
-
-        fprintf(stderr, "Hi!\n");
 
         char token;
         char name[MAX_INPUT_SIZE];
@@ -147,7 +144,6 @@ void feedInput(FILE* input){
             }
         }
 
-        mutex_unlock(&feedlock);
         // Signal that the command can be consumed
         if (lineAdded) {
             errWrap(sem_post(&cmdBuff), "Could not post on semaphore!");
@@ -158,11 +154,9 @@ void feedInput(FILE* input){
         // Produce exit commands (defined as the 'x' command)
         // Wait until the command can be replaced
         errWrap(sem_wait(&cmdFeed), "Error while waiting for the semaphore!");
-        mutex_lock(&feedlock);
 
         insertCommand("x");
 
-        mutex_unlock(&feedlock);
         errWrap(sem_post(&cmdBuff), "Could not post on semaphore!");
         // Signal that the command can be consumed
     }
