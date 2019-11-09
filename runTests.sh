@@ -11,8 +11,8 @@ outputdir=$2
 maxthreads=$3
 buckets=$4
 
-# Create a folder, ignore all errors
-mkdir $outputdir 2> /dev/null
+# Create a folder, ignore "file exists" error
+mkdir -p $outputdir
 
 function testfile {
     # Push stdout to a black hole, but keep stderr
