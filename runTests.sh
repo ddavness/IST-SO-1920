@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# Minimal argument validation
+if [ $# -ne 4 ]; then
+    echo "Usage: ${0} inputDir outputDir maxThreads numBuckets"
+    exit 1
+fi
+
 inputdir=$1
 outputdir=$2
 maxthreads=$3
@@ -19,8 +25,9 @@ function testfile {
         # Execution successful, we can use the trimmed version
         echo $lastline
     else
-        # Execution failed, dump all stderr
+        # Execution failed, dump all stderr and exit
         cat /tmp/tecnicofs_stderr.out
+        exit 1
     fi
 }
 
