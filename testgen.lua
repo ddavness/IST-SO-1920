@@ -81,7 +81,7 @@ for _,char in pairs({'c', 'l', 'd', 'r'}) do
     end
 end
 
-local fn = "inputs/luatest_"..cmdset.."_"..tostring(n).."_"..math.random(1, 10000)..".in"
+local fn = "inputs/luatest_"..cmdset.."_"..tostring(n).."_"..math.random(1, 10000)..".txt"
 print("Flushing to "..fn.."...")
 
 local f = io.open(fn, "a")
