@@ -51,38 +51,50 @@ static void parseArgs (int argc, char** const argv){
     // For the nosync edition, we are allowing the two last arguments
     // (num_threads and num_buckets) to be omitted, since they're redundant
 
-    if ((NOSYNC && (argc > 5 || argc < 3)) || (!NOSYNC && argc != 5)) {
+    if ((NOSYNC && (argc > 5 || argc < 4)) || (!NOSYNC && argc != 5)) {
         fprintf(stderr, red_bold("Invalid format!\n"));
-        fprintf(stderr, red("Usage: %s %s %s %s %s\n"), argv[0], "input_file[.txt]", "output_file[.txt]", "num_threads", "num_buckets");
+        fprintf(stderr, red("Usage: %s %s %s %s %s\n"),
+            argv[0],
+            "input_file[.txt]",
+            "output_file[.txt]",
+            NOSYNC ? "[num_threads = 1]" : "num_threads",
+            "num_buckets"
+        );
         exit(EXIT_FAILURE);
     }
 
     if (NOSYNC) {
         // Display a warn if a thread/bucket argument was passed (and it is different than 1)
-        if (
-            (argc == 4 && (argv[3][0] != '1' || argv[3][1] != '\0')) ||
-            (argc == 5 && (argv[3][0] != '1' || argv[3][1] != '\0' || argv[4][0] != '1' || argv[4][1] != '\0'))
-        ){
-            fprintf(stderr, yellow_bold("This program is ran in no-sync mode (sequentially), which means that it only runs one thread and one bucket.\n"));
+        char* buckets;
+
+        if (argc == 5){
+            if (argv[3][0] != '1' || argv[3][1] != '\0'){
+                fprintf(stderr, yellow_bold("This program is ran in no-sync mode (sequentially), which means that it only runs one thread.\n"));
+            }
+            buckets = argv[4];
+        } else {
+            buckets = argv[3];
         }
 
         numberThreads = 1;
-        numberBuckets = 1;
+        numberBuckets = atoi(buckets);
+        if (numberBuckets < 1) {
+            fprintf(stderr, "%s\n%s %s\n", red_bold("Invalid number of buckets!"), red("Expected a positive integer, got"), buckets);
+            exit(EXIT_FAILURE);
+        }
     } else {
         // Validates the number of threads and buckets, if in MT mode
 
-        int threads = atoi(argv[3]);
-        int buckets = atoi(argv[4]);
-        if (threads < 1) {
+        numberThreads = atoi(argv[3]);
+        numberBuckets = atoi(argv[4]);
+        if (numberThreads < 1) {
             fprintf(stderr, "%s\n%s %s\n", red_bold("Invalid number of threads!"), red("Expected a positive integer, got"), argv[3]);
             exit(EXIT_FAILURE);
-        } else if (buckets < 1) {
+        } else if (numberBuckets < 1) {
             fprintf(stderr, "%s\n%s %s\n", red_bold("Invalid number of buckets!"), red("Expected a positive integer, got"), argv[4]);
             exit(EXIT_FAILURE);
         } else {
-            fprintf(stderr, green("Spawning %d threads.\n\n"), threads);
-            numberThreads = threads;
-            numberBuckets = buckets;
+            fprintf(stderr, green("Spawning %d threads.\n\n"), numberThreads);
         }
     }
 }
