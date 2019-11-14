@@ -5,6 +5,7 @@ vgcore.*
 
 # Binary executables and object code - they're useless for the delivery!
 tecnicofs-*
+!tecnicofs-*.h
 *.o
 *.zip
 
