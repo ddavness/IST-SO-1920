@@ -7,7 +7,7 @@
     Authors: David Duque (93698);
              Filipe Ferro (70611)
 
-    First project, Sistemas Operativos, IST/UL, 2019/20
+    Third project, Sistemas Operativos, IST/UL, 2019/20
 
 */
 
@@ -34,6 +34,7 @@
 
 #define MAX_COMMANDS 10
 #define MAX_INPUT_SIZE 100
+#define THREAD_ALLOC_BLOCK 256
 
 char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
 
@@ -42,7 +43,6 @@ int feedQueue = 0;
 sem_t cmdFeed, cmdBuff;
 pthread_mutex_t cmdlock;
 
-int numberThreads = 0;
 int numberBuckets = 0;
 
 tecnicofs fs;
@@ -50,52 +50,24 @@ tecnicofs fs;
 static void parseArgs (int argc, char** const argv){
     // For the nosync edition, we are allowing the two last arguments
     // (num_threads and num_buckets) to be omitted, since they're redundant
-
-    if ((NOSYNC && (argc > 5 || argc < 4)) || (!NOSYNC && argc != 5)) {
+    if (argc != 4) {
         fprintf(stderr, red_bold("Invalid format!\n"));
-        fprintf(stderr, red("Usage: %s %s %s %s %s\n"),
+        fprintf(stderr, red("Usage: %s %s %s %s\n"),
             argv[0],
-            "input_file[.txt]",
+            "socket_name",
             "output_file[.txt]",
-            NOSYNC ? "[num_threads = 1]" : "num_threads",
             "num_buckets"
         );
         exit(EXIT_FAILURE);
     }
 
-    if (NOSYNC) {
-        // Display a warn if a thread/bucket argument was passed (and it is different than 1)
-        char* buckets;
-
-        if (argc == 5){
-            if (argv[3][0] != '1' || argv[3][1] != '\0'){
-                fprintf(stderr, yellow_bold("This program is ran in no-sync mode (sequentially), which means that it only runs one thread.\n"));
-            }
-            buckets = argv[4];
-        } else {
-            buckets = argv[3];
-        }
-
-        numberThreads = 1;
-        numberBuckets = atoi(buckets);
-        if (numberBuckets < 1) {
-            fprintf(stderr, "%s\n%s %s\n", red_bold("Invalid number of buckets!"), red("Expected a positive integer, got"), buckets);
-            exit(EXIT_FAILURE);
-        }
+    // Validates the number of buckets
+    numberBuckets = atoi(argv[3]);
+    if (numberBuckets < 1) {
+        fprintf(stderr, "%s\n%s %s\n", red_bold("Invalid number of buckets!"), red("Expected a positive integer, got"), argv[4]);
+        exit(EXIT_FAILURE);
     } else {
-        // Validates the number of threads and buckets, if in MT mode
-
-        numberThreads = atoi(argv[3]);
-        numberBuckets = atoi(argv[4]);
-        if (numberThreads < 1) {
-            fprintf(stderr, "%s\n%s %s\n", red_bold("Invalid number of threads!"), red("Expected a positive integer, got"), argv[3]);
-            exit(EXIT_FAILURE);
-        } else if (numberBuckets < 1) {
-            fprintf(stderr, "%s\n%s %s\n", red_bold("Invalid number of buckets!"), red("Expected a positive integer, got"), argv[4]);
-            exit(EXIT_FAILURE);
-        } else {
-            fprintf(stderr, green("Spawning %d threads.\n\n"), numberThreads);
-        }
+        fprintf(stderr, green("Spawning %d buckets.\n\n"), numberBuckets);
     }
 }
 
@@ -313,7 +285,7 @@ void deploy_threads(FILE* cmds) {
     errWrap(sem_init(&cmdBuff, 0, 0), "Unable to initialize buffer semaphore!");
 
     mutex_init(&cmdlock);
-    pthread_t threadPool[numberThreads];
+    pthread_t threadPool[THREAD_ALLOC_BLOCK];
 
     for (int i = 0; i < numberThreads; i++) {
         errWrap(pthread_create(&threadPool[i], NULL, applyCommands, NULL), "Failed to spawn thread!");
@@ -332,23 +304,6 @@ void deploy_threads(FILE* cmds) {
 
 int main(int argc, char** argv) {
     parseArgs(argc, argv);
-
-    // Try to open the input file.
-    // Possible errors when opening the file: No such directory, Access denied
-    FILE* cmds = fopen(argv[1], "r");
-    if (!cmds) {
-        fprintf(stderr, red_bold("Unable to open file '%s'!"), argv[1]);
-        perror("\nError");
-        exit(EXIT_FAILURE);
-    }
-    // Try to open the output file.
-    // Possible errors when opening/creating the file: Access denied
-    FILE* out = fopen(argv[2], "w");
-    if (!out) {
-        fprintf(stderr, red_bold("Unable to open file '%s'!"), argv[2]);
-        perror("\nError");
-        exit(EXIT_FAILURE);
-    }
 
     struct timeval start, end;
 
