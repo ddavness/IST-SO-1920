@@ -20,7 +20,7 @@ socket_t newSocket(char* socketPath) {
     sockaddr* server = malloc(sizeof(sockaddr));
     sockaddr* client = malloc(sizeof(sockaddr));
     fdesc socketfd;
-    errWrap(socketfd = socket(AF_UNIX, SOCK_STREAM, 0) < 0, "Unable to create socket!");
+    errWrap((socketfd = socket(AF_UNIX, SOCK_STREAM, 0)) <= 0, "Unable to create socket!");
     int err = unlink(socketPath);
     errWrap(err < 0 && errno != ENOENT, "Unable to secure the socket name!");
 
