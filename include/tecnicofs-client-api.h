@@ -3,6 +3,8 @@
 
 #include "tecnicofs-api-constants.h"
 
+typedef struct sockaddr_un sockaddr;
+
 int tfsCreate(char *filename, permission ownerPermissions, permission othersPermissions);
 int tfsDelete(char *filename);
 int tfsRename(char *filenameOld, char *filenameNew);
