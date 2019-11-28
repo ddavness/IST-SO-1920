@@ -35,17 +35,9 @@
 
 #define MAX_COMMANDS 10
 #define MAX_INPUT_SIZE 100
-#define THREAD_ALLOC_BLOCK 256
 
 char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
-
-int headQueue = 0;
-int feedQueue = 0;
-sem_t cmdFeed, cmdBuff;
-pthread_mutex_t cmdlock;
-
 int numberBuckets = 0;
-
 tecnicofs fs;
 
 static void parseArgs (int argc, char** const argv){
@@ -280,14 +272,7 @@ void* applyCommands(){
     return NULL;
 }
 
-void deploy_threads(FILE* cmds) {
-    // Initialize the IO lock and local thread pool.
-    errWrap(sem_init(&cmdFeed, 0, MAX_COMMANDS), "Unable to initialize feeder semaphore!");
-    errWrap(sem_init(&cmdBuff, 0, 0), "Unable to initialize buffer semaphore!");
-
-    mutex_init(&cmdlock);
-    pthread_t threadPool[THREAD_ALLOC_BLOCK];
-
+void deploy_threads(socket_t sock) {
     for (int i = 0; i < numberThreads; i++) {
         errWrap(pthread_create(&threadPool[i], NULL, applyCommands, NULL), "Failed to spawn thread!");
     }
@@ -299,12 +284,12 @@ void deploy_threads(FILE* cmds) {
     for (int i = 0; i < numberThreads; i++) {
         errWrap(pthread_join(threadPool[i], NULL), "Failed to join thread!");
     }
-
-    mutex_destroy(&cmdlock);
 }
 
 int main(int argc, char** argv) {
     parseArgs(argc, argv);
+    FILE* out;
+    errWrap(out = fopen(argv[3], "w") == NULL, "Unable to create/open output file!");
 
     // Deploy our socket
     socket_t socket = newSocket(argv[2]);
@@ -315,11 +300,10 @@ int main(int argc, char** argv) {
     fs = new_tecnicofs(numberBuckets);
 
     gettimeofday(&start, NULL);
-    deploy_threads(cmds);
+    deploy_threads(socket);
 
     print_tecnicofs_tree(out, fs);
     fclose(out);
-    fclose(cmds);
 
     free_tecnicofs(fs);
     gettimeofday(&end, NULL);
