@@ -29,7 +29,8 @@
 #include "lib/color.h"
 #include "lib/err.h"
 #include "lib/locks.h"
-#include "lib/void.h"
+#include "lib/socket.h"
+
 #include "fs.h"
 
 #define MAX_COMMANDS 10
@@ -304,6 +305,9 @@ void deploy_threads(FILE* cmds) {
 
 int main(int argc, char** argv) {
     parseArgs(argc, argv);
+
+    // Deploy our socket
+    socket_t socket = newSocket(argv[2]);
 
     struct timeval start, end;
 
