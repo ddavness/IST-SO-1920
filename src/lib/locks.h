@@ -5,11 +5,11 @@
 
 */
 
-#include "void.h"
 #include <pthread.h>
 
 #ifndef LOCKS
 #define LOCKS
+#define RWLOCK
 
 void mutex_init(pthread_mutex_t*);
 void mutex_lock(pthread_mutex_t*);

@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <wait.h>
 #include <pthread.h>
+#include <signal.h>
 #include <semaphore.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -70,17 +71,30 @@ void emitParseError(char* cmd){
     exit(EXIT_FAILURE);
 }
 
-void* applyCommands(){
+void* applyCommands(fdesc* in){
+    // TODO Find a better way to implement this
+    sigset_t mask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGINT);
+    sigaddset(&mask, SIGTERM);
+
+    pthread_sigmask(SIG_BLOCK, &mask, NULL);
+
+    fdesc input = *in;
+    char buffer[MAX_INPUT_SIZE];
     char token;
     char name[MAX_INPUT_SIZE];
     char targ[MAX_INPUT_SIZE];
 
     while (true) {
-        const char* command = removeCommand();
-        if (command == NULL){
-            fprintf(stderr, red_bold("Found null command in queue!\n"));
-            exit(EXIT_FAILURE);
-        } else if (command[0] == 'x') {
+        int linesread;
+        errWrap(linesread = readline(in, buffer, MAX_INPUT_SIZE) < 0, "Error while reading command!");
+        if (!linesread < 1) {
+            // Send over an error
+        }
+        sscanf(buffer, "%c %s %s", token, name, targ);
+
+        if (token == 'x') {
             return NULL;
         }
 
