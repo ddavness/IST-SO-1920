@@ -32,6 +32,7 @@
 #include "lib/err.h"
 #include "lib/locks.h"
 #include "lib/socket.h"
+#include "lib/tecnicofs-api-constants.h"
 
 #include "fs.h"
 
@@ -72,7 +73,7 @@ void emitParseError(char* cmd){
     exit(EXIT_FAILURE);
 }
 
-void* applyCommands(void* in){
+void* applyCommands(void* socket){
     // TODO Find a better way to implement this
     sigset_t mask;
     sigemptyset(&mask);
@@ -81,19 +82,28 @@ void* applyCommands(void* in){
 
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
 
-    FILE* input = fdopen(*((fdesc*)in), "r");
+    socket_t sock = *((socket_t*)socket);
+    FILE* input = fdopen(sock.socket, "r");
     char command[MAX_INPUT_SIZE];
 
     char token;
     char name[MAX_INPUT_SIZE];
     char targ[MAX_INPUT_SIZE];
 
-    while (true) {
+    for (;;) {
         char* success = fgets(command, MAX_INPUT_SIZE, input);
-        errWrap(!success, "Error while reading command!");
+        if (!success) {
+            // Keep waiting until something good arrives
+            continue;
+        }
+
         int numTokens = sscanf(command, "%c %s %s", &token, name, targ);
 
         if (token == 'x') {
+            // Client wants to unmount
+            errWrap(close(input), "Unable to close socket file!");
+            errWrap(close(sock.socket), "Unable to close socket fdescriptor!");
+            pthread_exit(NULL);
             return NULL;
         }
 
@@ -190,7 +200,7 @@ void deploy_threads(socket_t sock) {
     while (true)
     {
         socket_t fork = acceptConnectionFrom(sock);
-        pthread_create(fork.thread, NULL, applyCommands, &sock.socket);
+        pthread_create(fork.thread, NULL, applyCommands, &sock);
     }
 }
 
