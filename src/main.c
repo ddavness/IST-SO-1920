@@ -23,9 +23,10 @@
 #include <wait.h>
 #include <pthread.h>
 #include <signal.h>
-#include <semaphore.h>
+
 #include <sys/types.h>
 #include <sys/time.h>
+#include <sys/un.h>
 
 #include "lib/color.h"
 #include "lib/err.h"
@@ -71,7 +72,7 @@ void emitParseError(char* cmd){
     exit(EXIT_FAILURE);
 }
 
-void* applyCommands(fdesc* in){
+void* applyCommands(void* in){
     // TODO Find a better way to implement this
     sigset_t mask;
     sigemptyset(&mask);
@@ -80,25 +81,22 @@ void* applyCommands(fdesc* in){
 
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
 
-    fdesc input = *in;
-    char buffer[MAX_INPUT_SIZE];
+    FILE* input = fdopen(*((fdesc*)in), "r");
+    char command[MAX_INPUT_SIZE];
+
     char token;
     char name[MAX_INPUT_SIZE];
     char targ[MAX_INPUT_SIZE];
 
     while (true) {
-        int linesread;
-        errWrap(linesread = readline(in, buffer, MAX_INPUT_SIZE) < 0, "Error while reading command!");
-        if (!linesread < 1) {
-            // Send over an error
-        }
-        sscanf(buffer, "%c %s %s", token, name, targ);
+        char* success = fgets(command, MAX_INPUT_SIZE, input);
+        errWrap(!success, "Error while reading command!");
+        int numTokens = sscanf(command, "%c %s %s", &token, name, targ);
 
         if (token == 'x') {
             return NULL;
         }
 
-        int numTokens = sscanf(command, "%c %s %s", &token, name, targ);
         if (numTokens != 3 && numTokens != 2) {
             fprintf(stderr, "%s '%s'\n", red_bold("Error! Invalid command in Queue:"), command);
             exit(EXIT_FAILURE);
@@ -192,17 +190,17 @@ void deploy_threads(socket_t sock) {
     while (true)
     {
         socket_t fork = acceptConnectionFrom(sock);
-        pthread_create(fork.thread, NULL, NULL, NULL);
+        pthread_create(fork.thread, NULL, applyCommands, &sock.socket);
     }
 }
 
 int main(int argc, char** argv) {
     parseArgs(argc, argv);
-    FILE* out;
-    errWrap(out = fopen(argv[3], "w") == NULL, "Unable to create/open output file!");
+    FILE* out = fopen(argv[2], "w");
+    errWrap(out == NULL, "Unable to create/open output file!");
 
     // Deploy our socket
-    socket_t socket = newSocket(argv[2]);
+    socket_t socket = newSocket(argv[1]);
 
     struct timeval start, end;
 
