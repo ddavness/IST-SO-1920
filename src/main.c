@@ -64,86 +64,10 @@ static void parseArgs (int argc, char** const argv){
     }
 }
 
-void insertCommand(char* data) {
-    strcpy(inputCommands[feedQueue], data);
-    feedQueue = (feedQueue + 1) % MAX_COMMANDS;
-}
-
 void emitParseError(char* cmd){
     fprintf(stderr, "%s '%s'", yellow("Error! Invalid Command:"), cmd);
     fprintf(stderr, red_bold("\nParsing failure!\n"));
     exit(EXIT_FAILURE);
-}
-
-void feedInput(FILE* input){
-    char line[MAX_INPUT_SIZE];
-    int errs = 0;
-
-    while (fgets(line, sizeof(line)/sizeof(char), input)) {
-        bool lineAdded = true;
-
-        // Wait until the command can be replaced
-        errWrap(sem_wait(&cmdFeed), "Error while waiting for the feeder semaphore!");
-
-        char token;
-        char name[MAX_INPUT_SIZE];
-        char targ[MAX_INPUT_SIZE];
-
-        int numTokens = sscanf(line, "%c %s %s\n", &token, name, targ);
-
-        /* perform minimal validation */
-        if (numTokens < 1) {
-            continue;
-        }
-        switch (token) {
-            case 'c':
-            case 'l':
-            case 'd':
-                if (numTokens == 2) {
-                    insertCommand(line);
-                    break;
-                } else {
-                    continue;
-                }
-            case 'r':
-                if (numTokens != 3){
-                    emitParseError(line);
-                    errs++;
-                }
-                insertCommand(line);
-                break;
-            case '#':
-                lineAdded = false;
-                break;
-            default: { /* error */
-                emitParseError(line);
-                errs++;
-                break;
-            }
-        }
-
-        // Signal that the command can be consumed
-        if (lineAdded) {
-            errWrap(sem_post(&cmdBuff), "Could not post on buffer semaphore!");
-        }
-    }
-
-    for (int i = 0; i < numberThreads; i++) {
-        // Produce exit commands (defined as the 'x' command)
-        // Wait until the command can be replaced
-        errWrap(sem_wait(&cmdFeed), "Error while waiting for the feeder semaphore!");
-
-        insertCommand("x");
-
-        errWrap(sem_post(&cmdBuff), "Could not post on buffer semaphore!");
-        // Signal that the command can be consumed
-    }
-}
-
-char* removeCommand() {
-    char* cmd = inputCommands[headQueue];
-    headQueue = (headQueue + 1) % MAX_COMMANDS;
-    return cmd;
 }
 
 void* applyCommands(){
@@ -152,19 +76,11 @@ void* applyCommands(){
     char targ[MAX_INPUT_SIZE];
 
     while (true) {
-        // Wait until a command can be consumed
-        errWrap(sem_wait(&cmdBuff), "Error while waiting for the buffer semaphore!");
-        mutex_lock(&cmdlock);
-
         const char* command = removeCommand();
         if (command == NULL){
             fprintf(stderr, red_bold("Found null command in queue!\n"));
             exit(EXIT_FAILURE);
         } else if (command[0] == 'x') {
-            mutex_unlock(&cmdlock);
-            errWrap(sem_post(&cmdFeed), "Could not post on feeder semaphore!");
-            /* Allow the command to be replaced */
-
             return NULL;
         }
 
@@ -185,8 +101,6 @@ void* applyCommands(){
             case 'c':
                 // We're now unlocking because we've got the iNumber!
                 iNumber = obtainNewInumber(&fs);
-                mutex_unlock(&cmdlock);
-                errWrap(sem_post(&cmdFeed), "Could not post on feeder semaphore!");
 
                 LOCK_WRITE(fslock);
                 create(fs, name, iNumber);
@@ -194,9 +108,6 @@ void* applyCommands(){
 
                 break;
             case 'l':
-                mutex_unlock(&cmdlock);
-                errWrap(sem_post(&cmdFeed), "Could not post on feeder semaphore!");
-
                 LOCK_READ(fslock);
                 searchResult = lookup(fs, name);
 
@@ -209,18 +120,12 @@ void* applyCommands(){
 
                 break;
             case 'd':
-                mutex_unlock(&cmdlock);
-                errWrap(sem_post(&cmdFeed), "Could not post on feeder semaphore!");
-
                 LOCK_WRITE(fslock);
                 delete(fs, name);
                 LOCK_UNLOCK(fslock);
 
                 break;
             case 'r':
-                mutex_unlock(&cmdlock);
-                errWrap(sem_post(&cmdFeed), "Could not post on feeder semaphore!");
-
                 if (fslock == tglock) {
                     // We can simply rename in the tree
                     LOCK_WRITE(fslock);
@@ -259,9 +164,6 @@ void* applyCommands(){
 
                 break;
             default: {
-                mutex_unlock(&cmdlock);
-                errWrap(sem_post(&cmdFeed), "Could not post on feeder semaphore!");
-
                 fprintf(stderr, "%s %s\n", red_bold("Error! Invalid command in Queue:"), command);
                 exit(EXIT_FAILURE);
                 break;

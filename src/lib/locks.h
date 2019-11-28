@@ -32,8 +32,6 @@ void rwlock_destroy(pthread_rwlock_t*);
     #define LOCK_WRITE mutex_lock
     #define LOCK_UNLOCK mutex_unlock
     #define DESTROY_LOCK mutex_destroy
-
-    #define NOSYNC false
 #elif RWLOCK
     // Map macros to RWLOCK
 
@@ -44,8 +42,6 @@ void rwlock_destroy(pthread_rwlock_t*);
     #define LOCK_WRITE rwlock_wrlock
     #define LOCK_UNLOCK rwlock_unlock
     #define DESTROY_LOCK rwlock_destroy
-
-    #define NOSYNC false
 #else
     #error TecnicoFS requires a synchronization mechanism to be defined, either with the -DMUTEX or -DRWLOCK flag.
 #endif
