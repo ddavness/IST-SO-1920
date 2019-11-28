@@ -12,11 +12,15 @@
 #define TECNICOFS_SOCKET_H
 #define MAX_PENDING_CALL_QUEUE 32
 
+typedef int fdesc;
+
 typedef struct sockaddr_un sockaddr;
 
 typedef struct {
-    int socket;
-    sockaddr server;
+    fdesc socket;
+    pthread_t* thread;
+    sockaddr* server;
+    sockaddr* client;
 } socket_t;
 
 /*
@@ -39,6 +43,6 @@ socket_t newSocket(char*);
 
     In case of error, the program automatically exits.
 */
-pthread_t* acceptConnectionFrom(socket_t);
+socket_t acceptConnectionFrom(socket_t);
 
 #endif

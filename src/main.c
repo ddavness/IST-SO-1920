@@ -273,16 +273,10 @@ void* applyCommands(){
 }
 
 void deploy_threads(socket_t sock) {
-    for (int i = 0; i < numberThreads; i++) {
-        errWrap(pthread_create(&threadPool[i], NULL, applyCommands, NULL), "Failed to spawn thread!");
-    }
-
-    // Carry on, feed the buffer
-    feedInput(cmds);
-
-    // Wait until every thread is done.
-    for (int i = 0; i < numberThreads; i++) {
-        errWrap(pthread_join(threadPool[i], NULL), "Failed to join thread!");
+    while (true)
+    {
+        socket_t fork = acceptConnectionFrom(sock);
+        pthread_create(fork.thread, NULL, NULL, NULL);
     }
 }
 
