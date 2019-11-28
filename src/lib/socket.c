@@ -25,8 +25,8 @@ socket_t newSocket(char* socketPath) {
     errWrap(err < 0 && errno != ENOENT, "Unable to secure the socket name!");
 
     // Wipe all junk in the allocated memory
-    bzero((char*)server, sizeof(*server));
-    bzero((char*)client, sizeof(*client));
+    memset(server, '\0', sizeof(*server));
+    memset(client, '\0', sizeof(*client));
 
     server -> sun_family = AF_UNIX;
     strcpy(server -> sun_path, socketPath);
@@ -54,7 +54,7 @@ socket_t acceptConnectionFrom(socket_t sock) {
 
     // Create another clean client address for the main socket
     sockaddr* newclient = malloc(sizeof(sockaddr));
-    bzero((char*)newclient, sizeof(*newclient));
+    memset(newclient, '\0', sizeof(*newclient));
     sock.client = newclient;
 
     return fork;
