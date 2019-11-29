@@ -7,7 +7,7 @@
     Authors: David Duque (93698);
              Filipe Ferro (70611)
 
-    First project, Sistemas Operativos, IST/UL, 2019/20
+    Third project, Sistemas Operativos, IST/UL, 2019/20
 
 */
 
@@ -22,86 +22,49 @@
 #include <unistd.h>
 #include <wait.h>
 #include <pthread.h>
-#include <semaphore.h>
+#include <signal.h>
+
 #include <sys/types.h>
 #include <sys/time.h>
+#include <sys/un.h>
 
 #include "lib/color.h"
 #include "lib/err.h"
 #include "lib/locks.h"
-#include "lib/void.h"
+#include "lib/socket.h"
+#include "lib/tecnicofs-api-constants.h"
+
 #include "fs.h"
 
 #define MAX_COMMANDS 10
 #define MAX_INPUT_SIZE 100
 
 char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
-
-int headQueue = 0;
-int feedQueue = 0;
-sem_t cmdFeed, cmdBuff;
-pthread_mutex_t cmdlock;
-
-int numberThreads = 0;
 int numberBuckets = 0;
-
 tecnicofs fs;
 
 static void parseArgs (int argc, char** const argv){
     // For the nosync edition, we are allowing the two last arguments
     // (num_threads and num_buckets) to be omitted, since they're redundant
-
-    if ((NOSYNC && (argc > 5 || argc < 4)) || (!NOSYNC && argc != 5)) {
+    if (argc != 4) {
         fprintf(stderr, red_bold("Invalid format!\n"));
-        fprintf(stderr, red("Usage: %s %s %s %s %s\n"),
+        fprintf(stderr, red("Usage: %s %s %s %s\n"),
             argv[0],
-            "input_file[.txt]",
+            "socket_name",
             "output_file[.txt]",
-            NOSYNC ? "[num_threads = 1]" : "num_threads",
             "num_buckets"
         );
         exit(EXIT_FAILURE);
     }
 
-    if (NOSYNC) {
-        // Display a warn if a thread/bucket argument was passed (and it is different than 1)
-        char* buckets;
-
-        if (argc == 5){
-            if (argv[3][0] != '1' || argv[3][1] != '\0'){
-                fprintf(stderr, yellow_bold("This program is ran in no-sync mode (sequentially), which means that it only runs one thread.\n"));
-            }
-            buckets = argv[4];
-        } else {
-            buckets = argv[3];
-        }
-
-        numberThreads = 1;
-        numberBuckets = atoi(buckets);
-        if (numberBuckets < 1) {
-            fprintf(stderr, "%s\n%s %s\n", red_bold("Invalid number of buckets!"), red("Expected a positive integer, got"), buckets);
-            exit(EXIT_FAILURE);
-        }
+    // Validates the number of buckets
+    numberBuckets = atoi(argv[3]);
+    if (numberBuckets < 1) {
+        fprintf(stderr, "%s\n%s %s\n", red_bold("Invalid number of buckets!"), red("Expected a positive integer, got"), argv[4]);
+        exit(EXIT_FAILURE);
     } else {
-        // Validates the number of threads and buckets, if in MT mode
-
-        numberThreads = atoi(argv[3]);
-        numberBuckets = atoi(argv[4]);
-        if (numberThreads < 1) {
-            fprintf(stderr, "%s\n%s %s\n", red_bold("Invalid number of threads!"), red("Expected a positive integer, got"), argv[3]);
-            exit(EXIT_FAILURE);
-        } else if (numberBuckets < 1) {
-            fprintf(stderr, "%s\n%s %s\n", red_bold("Invalid number of buckets!"), red("Expected a positive integer, got"), argv[4]);
-            exit(EXIT_FAILURE);
-        } else {
-            fprintf(stderr, green("Spawning %d threads.\n\n"), numberThreads);
-        }
+        fprintf(stderr, green("Spawning %d buckets.\n\n"), numberBuckets);
     }
-}
-
-void insertCommand(char* data) {
-    strcpy(inputCommands[feedQueue], data);
-    feedQueue = (feedQueue + 1) % MAX_COMMANDS;
 }
 
 void emitParseError(char* cmd){
@@ -110,103 +73,45 @@ void emitParseError(char* cmd){
     exit(EXIT_FAILURE);
 }
 
-void feedInput(FILE* input){
-    char line[MAX_INPUT_SIZE];
-    int errs = 0;
+void* applyCommands(void* socket){
+    sigset_t mask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGINT);
+    sigaddset(&mask, SIGTERM);
 
-    while (fgets(line, sizeof(line)/sizeof(char), input)) {
-        bool lineAdded = true;
+    pthread_sigmask(SIG_BLOCK, &mask, NULL);
 
-        // Wait until the command can be replaced
-        errWrap(sem_wait(&cmdFeed), "Error while waiting for the feeder semaphore!");
+    socket_t sock = *((socket_t*)socket);
+    int statuscode[1];
+    char command[MAX_INPUT_SIZE];
+    command[0] = '\0';
 
-        char token;
-        char name[MAX_INPUT_SIZE];
-        char targ[MAX_INPUT_SIZE];
-
-        int numTokens = sscanf(line, "%c %s %s\n", &token, name, targ);
-
-        /* perform minimal validation */
-        if (numTokens < 1) {
-            continue;
-        }
-        switch (token) {
-            case 'c':
-            case 'l':
-            case 'd':
-                if (numTokens == 2) {
-                    insertCommand(line);
-                    break;
-                } else {
-                    continue;
-                }
-            case 'r':
-                if (numTokens != 3){
-                    emitParseError(line);
-                    errs++;
-                }
-                insertCommand(line);
-                break;
-            case '#':
-                lineAdded = false;
-                break;
-            default: { /* error */
-                emitParseError(line);
-                errs++;
-                break;
-            }
-        }
-
-        // Signal that the command can be consumed
-        if (lineAdded) {
-            errWrap(sem_post(&cmdBuff), "Could not post on buffer semaphore!");
-        }
-    }
-
-    for (int i = 0; i < numberThreads; i++) {
-        // Produce exit commands (defined as the 'x' command)
-        // Wait until the command can be replaced
-        errWrap(sem_wait(&cmdFeed), "Error while waiting for the feeder semaphore!");
-
-        insertCommand("x");
-
-        errWrap(sem_post(&cmdBuff), "Could not post on buffer semaphore!");
-        // Signal that the command can be consumed
-    }
-}
-
-char* removeCommand() {
-    char* cmd = inputCommands[headQueue];
-    headQueue = (headQueue + 1) % MAX_COMMANDS;
-    return cmd;
-}
-
-void* applyCommands(){
     char token;
     char name[MAX_INPUT_SIZE];
     char targ[MAX_INPUT_SIZE];
 
-    while (true) {
-        // Wait until a command can be consumed
-        errWrap(sem_wait(&cmdBuff), "Error while waiting for the buffer semaphore!");
-        mutex_lock(&cmdlock);
+    for (;;) {
+        int success = read(sock.socket, command, MAX_INPUT_SIZE);
 
-        const char* command = removeCommand();
-        if (command == NULL){
-            fprintf(stderr, red_bold("Found null command in queue!\n"));
-            exit(EXIT_FAILURE);
-        } else if (command[0] == 'x') {
-            mutex_unlock(&cmdlock);
-            errWrap(sem_post(&cmdFeed), "Could not post on feeder semaphore!");
-            /* Allow the command to be replaced */
-
+        // Sanity verification block
+        errWrap(success < 0, "Error reading commands!");
+        if (!success) {
+            // Client unmounted
+            printf("Client hung up, exiting...\n");
+            errWrap(close(sock.socket), "Unable to close socket fdescriptor!");
+            pthread_exit(NULL);
             return NULL;
         }
 
+        printf("'%s'\n", command);
+
         int numTokens = sscanf(command, "%c %s %s", &token, name, targ);
+
         if (numTokens != 3 && numTokens != 2) {
-            fprintf(stderr, "%s '%s'\n", red_bold("Error! Invalid command in Queue:"), command);
-            exit(EXIT_FAILURE);
+            fprintf(stderr, "%s '%s'\n", red("Caught invalid command:"), command);
+            *statuscode = TECNICOFS_ERROR_OTHER;
+            errWrap(send(sock.socket, statuscode, 1, 0) < 1, "Unable to deliver error code!");
+            continue;
         }
 
         lock* fslock = get_lock(fs, name);
@@ -220,8 +125,6 @@ void* applyCommands(){
             case 'c':
                 // We're now unlocking because we've got the iNumber!
                 iNumber = obtainNewInumber(&fs);
-                mutex_unlock(&cmdlock);
-                errWrap(sem_post(&cmdFeed), "Could not post on feeder semaphore!");
 
                 LOCK_WRITE(fslock);
                 create(fs, name, iNumber);
@@ -229,9 +132,6 @@ void* applyCommands(){
 
                 break;
             case 'l':
-                mutex_unlock(&cmdlock);
-                errWrap(sem_post(&cmdFeed), "Could not post on feeder semaphore!");
-
                 LOCK_READ(fslock);
                 searchResult = lookup(fs, name);
 
@@ -244,18 +144,12 @@ void* applyCommands(){
 
                 break;
             case 'd':
-                mutex_unlock(&cmdlock);
-                errWrap(sem_post(&cmdFeed), "Could not post on feeder semaphore!");
-
                 LOCK_WRITE(fslock);
                 delete(fs, name);
                 LOCK_UNLOCK(fslock);
 
                 break;
             case 'r':
-                mutex_unlock(&cmdlock);
-                errWrap(sem_post(&cmdFeed), "Could not post on feeder semaphore!");
-
                 if (fslock == tglock) {
                     // We can simply rename in the tree
                     LOCK_WRITE(fslock);
@@ -294,61 +188,35 @@ void* applyCommands(){
 
                 break;
             default: {
-                mutex_unlock(&cmdlock);
-                errWrap(sem_post(&cmdFeed), "Could not post on feeder semaphore!");
-
-                fprintf(stderr, "%s %s\n", red_bold("Error! Invalid command in Queue:"), command);
-                exit(EXIT_FAILURE);
+                fprintf(stderr, "%s '%s'\n", red("Caught invalid command:"), command);
+                *statuscode = TECNICOFS_ERROR_OTHER;
+                errWrap(send(sock.socket, statuscode, 1, 0) < 1, "Unable to deliver error code!");
                 break;
             }
         }
+        *statuscode = TECNICOFS_OK;
+        errWrap(send(sock.socket, statuscode, 1, 0) < 1, "Unable to deliver error code!");
     }
 
     return NULL;
 }
 
-void deploy_threads(FILE* cmds) {
-    // Initialize the IO lock and local thread pool.
-    errWrap(sem_init(&cmdFeed, 0, MAX_COMMANDS), "Unable to initialize feeder semaphore!");
-    errWrap(sem_init(&cmdBuff, 0, 0), "Unable to initialize buffer semaphore!");
-
-    mutex_init(&cmdlock);
-    pthread_t threadPool[numberThreads];
-
-    for (int i = 0; i < numberThreads; i++) {
-        errWrap(pthread_create(&threadPool[i], NULL, applyCommands, NULL), "Failed to spawn thread!");
+void deploy_threads(socket_t sock) {
+    while (true)
+    {
+        socket_t fork = acceptConnectionFrom(sock);
+        printf("Connected!\n");
+        pthread_create(fork.thread, NULL, applyCommands, &fork);
     }
-
-    // Carry on, feed the buffer
-    feedInput(cmds);
-
-    // Wait until every thread is done.
-    for (int i = 0; i < numberThreads; i++) {
-        errWrap(pthread_join(threadPool[i], NULL), "Failed to join thread!");
-    }
-
-    mutex_destroy(&cmdlock);
 }
 
 int main(int argc, char** argv) {
     parseArgs(argc, argv);
-
-    // Try to open the input file.
-    // Possible errors when opening the file: No such directory, Access denied
-    FILE* cmds = fopen(argv[1], "r");
-    if (!cmds) {
-        fprintf(stderr, red_bold("Unable to open file '%s'!"), argv[1]);
-        perror("\nError");
-        exit(EXIT_FAILURE);
-    }
-    // Try to open the output file.
-    // Possible errors when opening/creating the file: Access denied
     FILE* out = fopen(argv[2], "w");
-    if (!out) {
-        fprintf(stderr, red_bold("Unable to open file '%s'!"), argv[2]);
-        perror("\nError");
-        exit(EXIT_FAILURE);
-    }
+    errWrap(out == NULL, "Unable to create/open output file!");
+
+    // Deploy our socket
+    socket_t socket = newSocket(argv[1]);
 
     struct timeval start, end;
 
@@ -356,11 +224,10 @@ int main(int argc, char** argv) {
     fs = new_tecnicofs(numberBuckets);
 
     gettimeofday(&start, NULL);
-    deploy_threads(cmds);
+    deploy_threads(socket);
 
     print_tecnicofs_tree(out, fs);
     fclose(out);
-    fclose(cmds);
 
     free_tecnicofs(fs);
     gettimeofday(&end, NULL);

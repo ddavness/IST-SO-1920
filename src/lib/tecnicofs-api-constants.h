@@ -4,6 +4,9 @@
 
 typedef enum permission { NONE, WRITE, READ, RW } permission;
 
+/* Operation successful */
+#define TECNICOFS_OK 0
+
 /* Client already has an open session with a TecnicoFS server */
 #define TECNICOFS_ERROR_OPEN_SESSION -1
 /* Doesn't exist an open session */

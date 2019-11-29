@@ -16,6 +16,6 @@ void errWrap(int errCondition, char* msg) {
     if (errCondition) {
         fprintf(stderr, red_bold("%s"), msg);
         perror("\nError");
-        exit(EXIT_FAILURE);
+        abort();
     }
 }

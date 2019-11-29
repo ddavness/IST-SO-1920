@@ -5,7 +5,6 @@
 
 */
 
-#include "void.h"
 #include <pthread.h>
 
 #ifndef LOCKS
@@ -32,8 +31,6 @@ void rwlock_destroy(pthread_rwlock_t*);
     #define LOCK_WRITE mutex_lock
     #define LOCK_UNLOCK mutex_unlock
     #define DESTROY_LOCK mutex_destroy
-
-    #define NOSYNC false
 #elif RWLOCK
     // Map macros to RWLOCK
 
@@ -44,23 +41,8 @@ void rwlock_destroy(pthread_rwlock_t*);
     #define LOCK_WRITE rwlock_wrlock
     #define LOCK_UNLOCK rwlock_unlock
     #define DESTROY_LOCK rwlock_destroy
-
-    #define NOSYNC false
 #else
-    /*
-       Nosync mode. These macros are only defined so that
-       the compiler doesn't complain!
-    */
-
-    typedef void* lock;
-
-    #define INIT_LOCK void_noarg
-    #define LOCK_READ void_func
-    #define LOCK_WRITE void_func
-    #define LOCK_UNLOCK void_func
-    #define DESTROY_LOCK void_noarg
-
-    #define NOSYNC true
+    #error TecnicoFS requires a synchronization mechanism to be defined, either with the -DMUTEX or -DRWLOCK flag.
 #endif
 
 #endif
