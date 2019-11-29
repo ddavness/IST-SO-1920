@@ -20,7 +20,27 @@
 #define MAX_PATH_LENGTH 108
 
 int currentSocketFD = 0;
-char buff[] = "sudo apt install go commit die a sudo apt install go commit die a sudo apt install go commit die a ";
+char buff[] = "eeeeeeeeeeeez";
+int statuscode[1];
+
+/*
+    Internal function that sends a command to the tecnicofs server.
+*/
+int sendCommand(char* cmd) {
+    if (!currentSocketFD) {
+        return TECNICOFS_ERROR_NO_OPEN_SESSION;
+    }
+
+    if (send(currentSocketFD, cmd, (strlen(cmd) + 1)*sizeof(int), 0) < 0) {
+        return TECNICOFS_ERROR_OTHER;
+    }
+
+    if (read(currentSocketFD, statuscode, sizeof(int)) < 1) {
+        return TECNICOFS_ERROR_OTHER;
+    }
+
+    return *statuscode;
+}
 
 /*
     Mounts the client to the tecnicofs server via the socket provided by the address
@@ -33,18 +53,12 @@ int tfsMount(char* address) {
     }
 
     sockaddr* server = malloc(sizeof(sockaddr));
-    int sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
+    currentSocketFD = socket(AF_UNIX, SOCK_STREAM, 0);
     memset(server, '\0', sizeof(*server));
     server -> sun_family = AF_UNIX;
     strcpy(server -> sun_path, address);
 
-    if (connect(sockfd, (struct sockaddr*)server, sizeof(*server))) {
-        return TECNICOFS_ERROR_OTHER;
-    }
-
-    sleep(1);
-
-    if (send(sockfd, buff, 100, 0) < 1) {
+    if (connect(currentSocketFD, (struct sockaddr*)server, sizeof(*server))) {
         return TECNICOFS_ERROR_OTHER;
     }
 
@@ -60,4 +74,10 @@ int tfsUnmount() {
         return TECNICOFS_ERROR_NO_OPEN_SESSION;
     }
 
+    if (close(currentSocketFD)) {
+        return TECNICOFS_ERROR_OTHER;
+    }
+
+    currentSocketFD = 0;
+    return TECNICOFS_OK;
 }

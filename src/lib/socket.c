@@ -44,9 +44,9 @@ socket_t newSocket(char* socketPath) {
 socket_t acceptConnectionFrom(socket_t sock) {
     socket_t fork;
     int fork_fd;
-    unsigned int client_size = (unsigned int)sizeof(sock.client);
+    unsigned int clientSize = (unsigned int)sizeof(sock.client);
 
-    errWrap(fork_fd = accept(sock.socket, (struct sockaddr *)sock.client, &client_size) < 0, "An error occurred while listening to incoming calls!");
+    errWrap((fork_fd = accept(sock.socket, (struct sockaddr *)sock.client, &clientSize)) < 0, "An error occurred while listening to incoming calls!");
     fork.socket = fork_fd;
     fork.thread = malloc(sizeof(pthread_t));
     fork.client = sock.client; // Fork will inherit the client information

@@ -84,6 +84,7 @@ void* applyCommands(void* socket){
     socket_t sock = *((socket_t*)socket);
     int statuscode[1];
     char command[MAX_INPUT_SIZE];
+    command[0] = '\0';
 
     char token;
     char name[MAX_INPUT_SIZE];
@@ -109,7 +110,8 @@ void* applyCommands(void* socket){
         if (numTokens != 3 && numTokens != 2) {
             fprintf(stderr, "%s '%s'\n", red("Caught invalid command:"), command);
             *statuscode = TECNICOFS_ERROR_OTHER;
-            errWrap(send(sock.socket, statuscode, 1, 0), "Unable to deliver error code!");
+            errWrap(send(sock.socket, statuscode, 1, 0) < 1, "Unable to deliver error code!");
+            continue;
         }
 
         lock* fslock = get_lock(fs, name);
@@ -186,11 +188,14 @@ void* applyCommands(void* socket){
 
                 break;
             default: {
-                fprintf(stderr, "%s %s\n", red_bold("Error! Invalid command in Queue:"), command);
-                exit(EXIT_FAILURE);
+                fprintf(stderr, "%s '%s'\n", red("Caught invalid command:"), command);
+                *statuscode = TECNICOFS_ERROR_OTHER;
+                errWrap(send(sock.socket, statuscode, 1, 0) < 1, "Unable to deliver error code!");
                 break;
             }
         }
+        *statuscode = TECNICOFS_OK;
+        errWrap(send(sock.socket, statuscode, 1, 0) < 1, "Unable to deliver error code!");
     }
 
     return NULL;
