@@ -74,7 +74,6 @@ void emitParseError(char* cmd){
 }
 
 void* applyCommands(void* socket){
-    // TODO Find a better way to implement this
     sigset_t mask;
     sigemptyset(&mask);
     sigaddset(&mask, SIGINT);
@@ -83,7 +82,7 @@ void* applyCommands(void* socket){
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
 
     socket_t sock = *((socket_t*)socket);
-    FILE* input = fdopen(sock.socket, "r");
+    int statuscode[1];
     char command[MAX_INPUT_SIZE];
 
     char token;
@@ -91,25 +90,26 @@ void* applyCommands(void* socket){
     char targ[MAX_INPUT_SIZE];
 
     for (;;) {
-        char* success = fgets(command, MAX_INPUT_SIZE, input);
+        int success = read(sock.socket, command, MAX_INPUT_SIZE);
+
+        // Sanity verification block
+        errWrap(success < 0, "Error reading commands!");
         if (!success) {
-            // Keep waiting until something good arrives
-            continue;
-        }
-
-        int numTokens = sscanf(command, "%c %s %s", &token, name, targ);
-
-        if (token == 'x') {
-            // Client wants to unmount
-            errWrap(close(input), "Unable to close socket file!");
+            // Client unmounted
+            printf("Client hung up, exiting...\n");
             errWrap(close(sock.socket), "Unable to close socket fdescriptor!");
             pthread_exit(NULL);
             return NULL;
         }
 
+        printf("'%s'\n", command);
+
+        int numTokens = sscanf(command, "%c %s %s", &token, name, targ);
+
         if (numTokens != 3 && numTokens != 2) {
-            fprintf(stderr, "%s '%s'\n", red_bold("Error! Invalid command in Queue:"), command);
-            exit(EXIT_FAILURE);
+            fprintf(stderr, "%s '%s'\n", red("Caught invalid command:"), command);
+            *statuscode = TECNICOFS_ERROR_OTHER;
+            errWrap(send(sock.socket, statuscode, 1, 0), "Unable to deliver error code!");
         }
 
         lock* fslock = get_lock(fs, name);
@@ -200,7 +200,8 @@ void deploy_threads(socket_t sock) {
     while (true)
     {
         socket_t fork = acceptConnectionFrom(sock);
-        pthread_create(fork.thread, NULL, applyCommands, &sock);
+        printf("Connected!\n");
+        pthread_create(fork.thread, NULL, applyCommands, &fork);
     }
 }
 
