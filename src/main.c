@@ -30,6 +30,7 @@
 
 #include "lib/color.h"
 #include "lib/err.h"
+#include "lib/inodes.h"
 #include "lib/locks.h"
 #include "lib/socket.h"
 #include "lib/tecnicofs-api-constants.h"
@@ -60,18 +61,18 @@ static void parseArgs (int argc, char** const argv){
     // Validates the number of buckets
     numberBuckets = atoi(argv[3]);
     if (numberBuckets < 1) {
-        fprintf(stderr, "%s\n%s %s\n", red_bold("Invalid number of buckets!"), red("Expected a positive integer, got"), argv[4]);
+        fprintf(stderr, "%s\n%s %s\n",
+            red_bold("Invalid number of buckets!"),
+            red("Expected a positive integer, got"),
+            argv[4]
+        );
         exit(EXIT_FAILURE);
     } else {
         fprintf(stderr, green("Spawning %d buckets.\n\n"), numberBuckets);
     }
 }
 
-void emitParseError(char* cmd){
-    fprintf(stderr, "%s '%s'", yellow("Error! Invalid Command:"), cmd);
-    fprintf(stderr, red_bold("\nParsing failure!\n"));
-    exit(EXIT_FAILURE);
-}
+#define RETURN_STATUS(STATUS) *statuscode = STATUS; errWrap(send(sock.socket, statuscode, 1, 0) < 1, "Unable to deliver status code!")
 
 void* applyCommands(void* socket){
     sigset_t mask;
@@ -84,13 +85,16 @@ void* applyCommands(void* socket){
     socket_t sock = *((socket_t*)socket);
     int statuscode[1];
     char command[MAX_INPUT_SIZE];
-    command[0] = '\0';
-
+    char arg1[MAX_INPUT_SIZE];
+    char arg2[MAX_INPUT_SIZE];
     char token;
-    char name[MAX_INPUT_SIZE];
-    char targ[MAX_INPUT_SIZE];
 
     for (;;) {
+        // Shallow-clean buffers
+        command[0] = '\0';
+        arg1[0] = '\0';
+        arg2[0] = '\0';
+
         int success = read(sock.socket, command, MAX_INPUT_SIZE);
 
         // Sanity verification block
@@ -105,20 +109,15 @@ void* applyCommands(void* socket){
 
         printf("'%s'\n", command);
 
-        int numTokens = sscanf(command, "%c %s %s", &token, name, targ);
+        int numTokens = sscanf(command, "%c %s %s", &token, arg1, arg2);
 
         if (numTokens != 3 && numTokens != 2) {
             fprintf(stderr, "%s '%s'\n", red("Caught invalid command:"), command);
-            *statuscode = TECNICOFS_ERROR_OTHER;
-            errWrap(send(sock.socket, statuscode, 1, 0) < 1, "Unable to deliver status code!");
+            RETURN_STATUS(TECNICOFS_ERROR_OTHER);
             continue;
         }
 
-        lock* fslock = get_lock(fs, name);
-        lock* tglock;
-        if (numTokens == 3) {
-            tglock = get_lock(fs, targ);
-        }
+        lock *fslock, *tglock;
         int searchResult;
         int iNumber;
         switch (token) {
@@ -189,13 +188,11 @@ void* applyCommands(void* socket){
                 break;
             default: {
                 fprintf(stderr, "%s '%s'\n", red("Caught invalid command:"), command);
-                *statuscode = TECNICOFS_ERROR_OTHER;
-                errWrap(send(sock.socket, statuscode, 1, 0) < 1, "Unable to deliver status code!");
+                RETURN_STATUS(TECNICOFS_ERROR_OTHER);
                 break;
             }
         }
-        *statuscode = TECNICOFS_OK;
-        errWrap(send(sock.socket, statuscode, 1, 0) < 1, "Unable to deliver status code!");
+        RETURN_STATUS(TECNICOFS_OK);
     }
 
     return NULL;
@@ -212,9 +209,10 @@ void deploy_threads(socket_t sock) {
 
 int main(int argc, char** argv) {
     parseArgs(argc, argv);
-    FILE* out = fopen(argv[2], "w");
-    errWrap(out == NULL, "Unable to create/open output file!");
+    FILE* out;
+    errWrap((out = fopen(argv[2], "w")) == NULL, "Unable to create/open output file!");
 
+    inode_table_init();
     // Deploy our socket
     socket_t socket = newSocket(argv[1]);
 
@@ -230,6 +228,7 @@ int main(int argc, char** argv) {
     fclose(out);
 
     free_tecnicofs(fs);
+    inode_table_destroy();
     gettimeofday(&end, NULL);
 
     double elapsed = (((double)(end.tv_usec - start.tv_usec)) / 1000000.0) + ((double)(end.tv_sec - start.tv_sec));
