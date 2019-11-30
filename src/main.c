@@ -110,7 +110,7 @@ void* applyCommands(void* socket){
         if (numTokens != 3 && numTokens != 2) {
             fprintf(stderr, "%s '%s'\n", red("Caught invalid command:"), command);
             *statuscode = TECNICOFS_ERROR_OTHER;
-            errWrap(send(sock.socket, statuscode, 1, 0) < 1, "Unable to deliver error code!");
+            errWrap(send(sock.socket, statuscode, 1, 0) < 1, "Unable to deliver status code!");
             continue;
         }
 
@@ -190,12 +190,12 @@ void* applyCommands(void* socket){
             default: {
                 fprintf(stderr, "%s '%s'\n", red("Caught invalid command:"), command);
                 *statuscode = TECNICOFS_ERROR_OTHER;
-                errWrap(send(sock.socket, statuscode, 1, 0) < 1, "Unable to deliver error code!");
+                errWrap(send(sock.socket, statuscode, 1, 0) < 1, "Unable to deliver status code!");
                 break;
             }
         }
         *statuscode = TECNICOFS_OK;
-        errWrap(send(sock.socket, statuscode, 1, 0) < 1, "Unable to deliver error code!");
+        errWrap(send(sock.socket, statuscode, 1, 0) < 1, "Unable to deliver status code!");
     }
 
     return NULL;
