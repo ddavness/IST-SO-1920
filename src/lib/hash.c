@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include "hash.h"
 
 /* Simple hash function for strings.

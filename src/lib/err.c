@@ -6,6 +6,8 @@
 
 */
 
+#define _GNU_SOURCE
+
 #include "color.h"
 #include "err.h"
 #include <stdio.h>
