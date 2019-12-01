@@ -32,11 +32,11 @@ int sendCommand(char* cmd) {
     }
 
     if (send(currentSocketFD, cmd, (strlen(cmd) + 1)*sizeof(int), 0) < 0) {
-        return TECNICOFS_ERROR_OTHER;
+        return TECNICOFS_ERROR_CONNECTION_ERROR;
     }
 
     if (read(currentSocketFD, statuscode, sizeof(int)) < 1) {
-        return TECNICOFS_ERROR_OTHER;
+        return TECNICOFS_ERROR_CONNECTION_ERROR;
     }
 
     return *statuscode;
@@ -59,7 +59,7 @@ int tfsMount(char* address) {
     strcpy(server -> sun_path, address);
 
     if (connect(currentSocketFD, (struct sockaddr*)server, sizeof(*server))) {
-        return TECNICOFS_ERROR_OTHER;
+        return TECNICOFS_ERROR_CONNECTION_ERROR;
     }
 
     return TECNICOFS_OK;
