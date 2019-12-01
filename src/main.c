@@ -123,10 +123,19 @@ void* applyCommands(void* socket){
         switch (token) {
             case 'c': // creates a file (c filename perms)
             {
-                lock* fslock = get_lock(fs, arg1);
+                int me = arg2[0] - '0';
+                int others = arg2[1] - '0';
+                if (
+                    me < 0 || me > 3 ||
+                    others < 0 || others > 3 ||
+                    arg2[2] != '\0'
+                ) {
+                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
+                }
 
+                lock* fslock = get_lock(fs, arg1);
                 LOCK_WRITE(fslock);
-                iNumber = inode_create(sock.userId, RW, RW);
+                iNumber = inode_create(sock.userId, me, others);
                 if (iNumber < 0) {
                     // inode table is full
                     LOCK_UNLOCK(fslock);
