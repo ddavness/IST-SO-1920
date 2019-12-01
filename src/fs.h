@@ -11,10 +11,8 @@ typedef struct tecnicofs_node {
 typedef struct tecnicofs {
     int numBuckets;
     tecnicofs_node* fs;
-    int nextINumber;
 } tecnicofs;
 
-int obtainNewInumber(tecnicofs*);
 tecnicofs new_tecnicofs(int);
 void free_tecnicofs(tecnicofs);
 void create(tecnicofs, char*, int);

@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -7,16 +9,10 @@
 #include "lib/hash.h"
 #include "lib/locks.h"
 
-int obtainNewInumber(tecnicofs* fs) {
-    int newInumber = ++(fs -> nextINumber);
-    return newInumber;
-}
-
 tecnicofs new_tecnicofs(int buckets){
     tecnicofs root;
     root.numBuckets = buckets;
     root.fs = malloc(sizeof(tecnicofs_node) * buckets);
-    root.nextINumber = 0;
 
     if (!root.fs) {
         fprintf(stderr, red_bold("Failed to allocate TecnicoFS!"));
