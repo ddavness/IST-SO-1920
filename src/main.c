@@ -230,16 +230,21 @@ void* applyCommands(void* socket){
 }
 
 void deploy_threads(socket_t sock) {
+    socket_t fork;
     while (true)
     {
-        socket_t fork = acceptConnectionFrom(sock);
+        fork = acceptConnectionFrom(sock);
         printf("Connected!\nConnection details:\n %s %d\n %s %d\n",
             yellow_bold("> PID:"),
             fork.procId,
             yellow_bold("> UID:"),
             fork.userId
         );
-        pthread_create(fork.thread, NULL, applyCommands, &fork);
+
+        // TODO Store this somewhere
+        socket_t* forkptr = malloc(sizeof(socket_t));
+        memcpy(forkptr, &fork, sizeof(socket_t));
+        pthread_create(fork.thread, NULL, applyCommands, forkptr);
     }
 }
 
