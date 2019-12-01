@@ -9,6 +9,12 @@
 #ifndef ERR
 #define ERR
 
+#ifdef DEBUGMODE
+    #define die abort()
+#else
+    #define die exit(EXIT_FAILURE)
+#endif
+
 void errWrap(int, char*);
 
 #endif
