@@ -42,6 +42,14 @@ void rwlock_destroy(pthread_rwlock_t*);
     #define LOCK_UNLOCK rwlock_unlock
     #define DESTROY_LOCK rwlock_destroy
 #else
+    typedef void* lock;
+
+    #define INIT_LOCK
+    #define LOCK_READ
+    #define LOCK_WRITE
+    #define LOCK_UNLOCK
+    #define DESTROY_LOCK
+
     #error TecnicoFS requires a synchronization mechanism to be defined, either with the -DMUTEX or -DRWLOCK flag.
 #endif
 
