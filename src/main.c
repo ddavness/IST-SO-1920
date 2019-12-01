@@ -74,7 +74,7 @@ static void parseArgs (int argc, char** const argv){
     }
 }
 
-#define RETURN_STATUS(STATUS) *statuscode = STATUS; errWrap(send(sock.socket, statuscode, 1, 0) < 1, "Unable to deliver status code!")
+#define RETURN_STATUS(STATUS) *statuscode = STATUS; errWrap(send(sock.socket, statuscode, sizeof(int), 0) < 1, "Unable to deliver status code!"); continue
 
 void* applyCommands(void* socket){
     sigset_t mask;
@@ -123,16 +123,49 @@ void* applyCommands(void* socket){
         int searchResult;
         int iNumber;
         switch (token) {
-            case 'c':
+            case 'c': // creates a file (c filename perms)
                 iNumber = inode_create(sock.userId, RW, RW);
+                if (iNumber < 0) {
+                    // inode table is full
+                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
+                }
                 fslock = get_lock(fs, arg1);
 
                 LOCK_WRITE(fslock);
+                if (lookup(fs, arg1) >= 0) {
+                    printf("'%s' already exists.\n", arg1);
+                    LOCK_UNLOCK(fslock);
+                    RETURN_STATUS(TECNICOFS_ERROR_FILE_ALREADY_EXISTS);
+                }
+
                 create(fs, arg1, iNumber);
                 LOCK_UNLOCK(fslock);
 
                 break;
-            case 'l':
+            case 'd': // delete file (d filename)
+                LOCK_WRITE(fslock);
+
+                int target = lookup(fs, arg1);
+                if (target < 0) {
+                    LOCK_UNLOCK(fslock);
+                    RETURN_STATUS(TECNICOFS_ERROR_FILE_NOT_FOUND);
+                }
+                uid_t owner;
+                if (inode_get(target, &owner, NULL, NULL, NULL, 0)) {
+                    LOCK_UNLOCK(fslock);
+                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
+                }
+                if (owner != sock.userId) {
+                    LOCK_UNLOCK(fslock);
+                    RETURN_STATUS(TECNICOFS_ERROR_PERMISSION_DENIED);
+                }
+
+                inode_delete(target);
+                delete(fs, arg1);
+
+                LOCK_UNLOCK(fslock);
+                break;
+            case 'l': // reads from an open file (l fd)
                 LOCK_READ(fslock);
                 searchResult = lookup(fs, arg1);
 
@@ -141,12 +174,6 @@ void* applyCommands(void* socket){
                 } else {
                     printf("%s found with inumber %d\n", arg1, searchResult);
                 }
-                LOCK_UNLOCK(fslock);
-
-                break;
-            case 'd':
-                LOCK_WRITE(fslock);
-                delete(fs, arg1);
                 LOCK_UNLOCK(fslock);
 
                 break;
@@ -194,6 +221,8 @@ void* applyCommands(void* socket){
                 break;
             }
         }
+
+        // Everything went smooth, return OK status
         RETURN_STATUS(TECNICOFS_OK);
     }
 
