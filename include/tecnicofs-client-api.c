@@ -19,6 +19,8 @@
 
 #define MAX_PATH_LENGTH 108
 
+typedef struct sockaddr_un sockaddr;
+
 int currentSocketFD = 0;
 char buff[] = "eeeeeeeeeeeez";
 int statuscode[1];
