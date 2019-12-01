@@ -58,7 +58,7 @@ int lookup(tecnicofs fs, char *name){
     if (searchNode) {
         return searchNode -> inumber;
     }
-    return 0;
+    return -1;
 }
 
 lock* get_lock(tecnicofs fs, char *name){
