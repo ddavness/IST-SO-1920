@@ -178,29 +178,37 @@ void* applyCommands(void* socket){
                 LOCK_UNLOCK(fslock);
                 break;
             }
-            /*case 'l': // reads from an open file (l fd)
-                LOCK_READ(fslock);
-                searchResult = lookup(fs, arg1);
+            case 'r': // rename file (r old new)
+            {
+                lock* fslock = get_lock(fs, arg1);
+                lock* tglock = get_lock(fs, arg2);
 
-                if (!searchResult) {
-                    printf("%s not found\n", arg1);
-                } else {
-                    printf("%s found with inumber %d\n", arg1, searchResult);
-                }
-                LOCK_UNLOCK(fslock);
-
-                break;
-            case 'r':
                 if (fslock == tglock) {
                     // We can simply rename in the tree
                     LOCK_WRITE(fslock);
 
-                    int originFile = lookup(fs, arg1);
+                    iNumber = lookup(fs, arg1);
+                    if (iNumber < 0) {
+                        LOCK_UNLOCK(fslock);
+                        RETURN_STATUS(TECNICOFS_ERROR_FILE_NOT_FOUND);
+                    }
+                    uid_t owner;
+                    if (inode_get(iNumber, &owner, NULL, NULL, NULL, 0)) {
+                        LOCK_UNLOCK(fslock);
+                        RETURN_STATUS(TECNICOFS_ERROR_OTHER);
+                    }
+                    if (owner != sock.userId) {
+                        LOCK_UNLOCK(fslock);
+                        RETURN_STATUS(TECNICOFS_ERROR_PERMISSION_DENIED);
+                    }
                     int targetFile = lookup(fs, arg2);
 
-                    if (originFile && !targetFile) {
+                    if (targetFile < 0) {
                         delete(fs, arg1);
-                        create(fs, arg2, originFile);
+                        create(fs, arg2, iNumber);
+                    } else {
+                        LOCK_UNLOCK(fslock);
+                        RETURN_STATUS(TECNICOFS_ERROR_FILE_ALREADY_EXISTS);
                     }
 
                     LOCK_UNLOCK(fslock);
@@ -215,17 +223,50 @@ void* applyCommands(void* socket){
                     LOCK_WRITE(fslock);
                     LOCK_WRITE(tglock);
 
-                    int originFile = lookup(fs, arg1);
+                    iNumber = lookup(fs, arg1);
+                    if (iNumber < 0) {
+                        LOCK_UNLOCK(tglock);
+                        LOCK_UNLOCK(fslock);
+                        RETURN_STATUS(TECNICOFS_ERROR_FILE_NOT_FOUND);
+                    }
+                    uid_t owner;
+                    if (inode_get(iNumber, &owner, NULL, NULL, NULL, 0)) {
+                        LOCK_UNLOCK(tglock);
+                        LOCK_UNLOCK(fslock);
+                        RETURN_STATUS(TECNICOFS_ERROR_OTHER);
+                    }
+                    if (owner != sock.userId) {
+                        LOCK_UNLOCK(tglock);
+                        LOCK_UNLOCK(fslock);
+                        RETURN_STATUS(TECNICOFS_ERROR_PERMISSION_DENIED);
+                    }
                     int targetFile = lookup(fs, arg2);
 
-                    if (originFile && !targetFile) {
+                    if (targetFile < 0) {
                         delete(fs, arg1);
-                        create(fs, arg2, originFile);
+                        create(fs, arg2, iNumber);
+                    } else {
+                        LOCK_UNLOCK(tglock);
+                        LOCK_UNLOCK(fslock);
+                        RETURN_STATUS(TECNICOFS_ERROR_FILE_ALREADY_EXISTS);
                     }
 
                     LOCK_UNLOCK(tglock);
                     LOCK_UNLOCK(fslock);
                 }
+
+                break;
+            }
+            /*case 'l': // reads from an open file (l fd)
+                LOCK_READ(fslock);
+                searchResult = lookup(fs, arg1);
+
+                if (!searchResult) {
+                    printf("%s not found\n", arg1);
+                } else {
+                    printf("%s found with inumber %d\n", arg1, searchResult);
+                }
+                LOCK_UNLOCK(fslock);
 
                 break;*/
             default: {
