@@ -36,6 +36,8 @@ socket_t newSocket(char* socketPath) {
 
     errWrap(bind(socketfd, (struct sockaddr *)server, sizeof(*server)) < 0, "Unable to bind socket to local address!");
     sock.socket = socketfd;
+    sock.userId = -1;
+    sock.procId = -1;
     sock.thread = NULL;
     sock.server = server;
     sock.client = client;
@@ -47,13 +49,19 @@ socket_t newSocket(char* socketPath) {
 socket_t acceptConnectionFrom(socket_t sock) {
     socket_t fork;
     int fork_fd;
-    unsigned int clientSize = (unsigned int)sizeof(sock.client);
+    socklen_t clientSize = (socklen_t)sizeof(sock.client);
 
     errWrap((fork_fd = accept(sock.socket, (struct sockaddr *)sock.client, &clientSize)) < 0, "An error occurred while listening to incoming calls!");
     fork.socket = fork_fd;
     fork.thread = malloc(sizeof(pthread_t));
     fork.client = sock.client; // Fork will inherit the client information
     fork.server = NULL;
+
+    struct ucred user;
+    socklen_t usersize = sizeof(struct ucred);
+    errWrap(getsockopt(fork_fd, SOL_SOCKET, SO_PEERCRED, &user, &usersize), "Failed to get user id!");
+    fork.procId = user.pid;
+    fork.userId = user.uid;
 
     // Create another clean client address for the main socket
     sockaddr* newclient = malloc(sizeof(sockaddr));

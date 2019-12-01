@@ -18,6 +18,8 @@ typedef struct sockaddr_un sockaddr;
 
 typedef struct {
     fdesc socket;
+    uid_t userId;
+    pid_t procId;
     pthread_t* thread;
     sockaddr* server;
     sockaddr* client;

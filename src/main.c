@@ -124,29 +124,29 @@ void* applyCommands(void* socket){
         int iNumber;
         switch (token) {
             case 'c':
-                // We're now unlocking because we've got the iNumber!
-                iNumber = obtainNewInumber(&fs);
+                iNumber = inode_create(sock.userId, RW, RW);
+                fslock = get_lock(fs, arg1);
 
                 LOCK_WRITE(fslock);
-                create(fs, name, iNumber);
+                create(fs, arg1, iNumber);
                 LOCK_UNLOCK(fslock);
 
                 break;
             case 'l':
                 LOCK_READ(fslock);
-                searchResult = lookup(fs, name);
+                searchResult = lookup(fs, arg1);
 
                 if (!searchResult) {
-                    printf("%s not found\n", name);
+                    printf("%s not found\n", arg1);
                 } else {
-                    printf("%s found with inumber %d\n", name, searchResult);
+                    printf("%s found with inumber %d\n", arg1, searchResult);
                 }
                 LOCK_UNLOCK(fslock);
 
                 break;
             case 'd':
                 LOCK_WRITE(fslock);
-                delete(fs, name);
+                delete(fs, arg1);
                 LOCK_UNLOCK(fslock);
 
                 break;
@@ -155,12 +155,12 @@ void* applyCommands(void* socket){
                     // We can simply rename in the tree
                     LOCK_WRITE(fslock);
 
-                    int originFile = lookup(fs, name);
-                    int targetFile = lookup(fs, targ);
+                    int originFile = lookup(fs, arg1);
+                    int targetFile = lookup(fs, arg2);
 
                     if (originFile && !targetFile) {
-                        delete(fs, name);
-                        create(fs, targ, originFile);
+                        delete(fs, arg1);
+                        create(fs, arg2, originFile);
                     }
 
                     LOCK_UNLOCK(fslock);
@@ -175,12 +175,12 @@ void* applyCommands(void* socket){
                     LOCK_WRITE(fslock);
                     LOCK_WRITE(tglock);
 
-                    int originFile = lookup(fs, name);
-                    int targetFile = lookup(fs, targ);
+                    int originFile = lookup(fs, arg1);
+                    int targetFile = lookup(fs, arg2);
 
                     if (originFile && !targetFile) {
-                        delete(fs, name);
-                        create(fs, targ, originFile);
+                        delete(fs, arg1);
+                        create(fs, arg2, originFile);
                     }
 
                     LOCK_UNLOCK(tglock);
@@ -204,7 +204,12 @@ void deploy_threads(socket_t sock) {
     while (true)
     {
         socket_t fork = acceptConnectionFrom(sock);
-        printf("Connected!\n");
+        printf("Connected!\nConnection details:\n %s %d\n %s %d\n",
+            yellow_bold("> PID:"),
+            fork.procId,
+            yellow_bold("> UID:"),
+            fork.userId
+        );
         pthread_create(fork.thread, NULL, applyCommands, &fork);
     }
 }
