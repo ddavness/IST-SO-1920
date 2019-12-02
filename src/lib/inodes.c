@@ -69,6 +69,7 @@ int inode_create(uid_t owner, permission ownerPerm, permission othersPerm){
     lock_inode_table();
     for(int inumber = 0; inumber < INODE_TABLE_SIZE; inumber++){
         if(inode_table[inumber].owner == FREE_INODE){
+            inode_table[inumber].fileDescriptors = 0;
             inode_table[inumber].owner = owner;
             inode_table[inumber].ownerPermissions = ownerPerm;
             inode_table[inumber].othersPermissions = othersPerm;
@@ -87,12 +88,17 @@ int inode_create(uid_t owner, permission ownerPerm, permission othersPerm){
  *  - inumber: identifier of the i-node
  * Returns:
  *   0: if successful
- *  -1: if an error occurs
+ *  -1: if the file is still open
+ *  -2: if an error occurs
  */
 int inode_delete(int inumber){
     lock_inode_table();
     if((inumber < 0) || (inumber > INODE_TABLE_SIZE) || (inode_table[inumber].owner == FREE_INODE)){
         printf("inode_delete: invalid inumber");
+        unlock_inode_table();
+        return -2;
+    } else if (inode_table[inumber].fileDescriptors) {
+        printf("inode_delete: file is still open");
         unlock_inode_table();
         return -1;
     }
@@ -118,7 +124,7 @@ int inode_delete(int inumber){
  *    len of content read:if successful
  *   -1: if an error occurs
  */
-int inode_get(int inumber,uid_t *owner, permission *ownerPerm, permission *othersPerm,
+int inode_get(int inumber, int* numFilesOpen, uid_t *owner, permission *ownerPerm, permission *othersPerm,
                      char* fileContents, int len){
     lock_inode_table();
     if((inumber < 0) || (inumber > INODE_TABLE_SIZE) || (inode_table[inumber].owner == FREE_INODE)){
@@ -132,6 +138,9 @@ int inode_get(int inumber,uid_t *owner, permission *ownerPerm, permission *other
         unlock_inode_table();
         return -1;
     }
+
+    if(numFilesOpen)
+        *numFilesOpen = inode_table[inumber].fileDescriptors;
 
     if(owner)
         *owner = inode_table[inumber].owner;
@@ -185,6 +194,38 @@ int inode_set(int inumber, char *fileContents, int len){
     inode_table[inumber].fileContent = malloc(sizeof(char) * (len+1));
     strncpy(inode_table[inumber].fileContent, fileContents, len);
     inode_table[inumber].fileContent[len] = '\0';
+
+    unlock_inode_table();
+    return 0;
+}
+
+/*
+ * Updates the number of open file descriptors linked to the file
+ * Input:
+ *  - inumber: identifier of the i-node
+ *  - direction: 1 to add a file descriptor, -1 to remove it
+ * Returns:
+ *    0 if successful
+ *   -1 if an error occurs
+ */
+int inode_update_fd(int inumber, int direction) {
+    lock_inode_table();
+    if((inumber < 0) || (inumber > INODE_TABLE_SIZE) || (inode_table[inumber].owner == FREE_INODE)){
+        printf("inode_setFileContent: invalid inumber");
+        unlock_inode_table();
+        return -1;
+    } else if (direction != 1 && direction != -1) {
+        printf("inode_setFileContent: invalid update code");
+        unlock_inode_table();
+        return -1;
+    }
+
+    inode_table[inumber].fileDescriptors += direction;
+    if (inode_table[inumber].fileDescriptors < 0) {
+        printf("inode_setFileContent: inode in inconsistent state");
+        unlock_inode_table();
+        return -1;
+    }
 
     unlock_inode_table();
     return 0;

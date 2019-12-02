@@ -86,6 +86,7 @@ void* applyCommands(void* socket){
 
     socket_t sock = *((socket_t*)socket);
     int statuscode[1];
+    int openfiles[MAX_OPEN_FILES] = {-1, -1, -1, -1, -1};
     char command[MAX_INPUT_SIZE];
     char arg1[MAX_INPUT_SIZE];
     char arg2[MAX_INPUT_SIZE];
@@ -177,14 +178,19 @@ void* applyCommands(void* socket){
                 }
 
                 // Make sure the we are the actual owner of the file
+                // And that such file is not open
+
                 uid_t owner;
-                if (inode_get(iNumber, &owner, NULL, NULL, NULL, 0) < 0) {
+                int fileIsOpen;
+                if (inode_get(iNumber, &fileIsOpen, &owner, NULL, NULL, NULL, 0) < 0) {
                     LOCK_UNLOCK(fslock);
                     RETURN_STATUS(TECNICOFS_ERROR_OTHER);
-                }
-                if (owner != sock.userId) {
+                } else if (owner != sock.userId) {
                     LOCK_UNLOCK(fslock);
                     RETURN_STATUS(TECNICOFS_ERROR_PERMISSION_DENIED);
+                } else if (fileIsOpen) {
+                    LOCK_UNLOCK(fslock);
+                    RETURN_STATUS(TECNICOFS_ERROR_FILE_IS_OPEN);
                 }
 
                 // All checks passed, delete the file
@@ -217,7 +223,7 @@ void* applyCommands(void* socket){
 
                     // Make sure we own the file we're moving
                     uid_t owner;
-                    if (inode_get(iNumber, &owner, NULL, NULL, NULL, 0) < 0) {
+                    if (inode_get(iNumber, NULL, &owner, NULL, NULL, NULL, 0) < 0) {
                         LOCK_UNLOCK(fslock);
                         RETURN_STATUS(TECNICOFS_ERROR_OTHER);
                     }
@@ -257,7 +263,7 @@ void* applyCommands(void* socket){
                         RETURN_STATUS(TECNICOFS_ERROR_FILE_NOT_FOUND);
                     }
                     uid_t owner;
-                    if (inode_get(iNumber, &owner, NULL, NULL, NULL, 0) < 0) {
+                    if (inode_get(iNumber, NULL, &owner, NULL, NULL, NULL, 0) < 0) {
                         LOCK_UNLOCK(tglock);
                         LOCK_UNLOCK(fslock);
                         RETURN_STATUS(TECNICOFS_ERROR_OTHER);
@@ -284,7 +290,7 @@ void* applyCommands(void* socket){
 
                 break;
             }
-            case 'o': // reads from an open file (o filename mode)
+            case 'o': // opens a file (o filename mode)
             {
                 // General syntax validation
                 if (numTokens != 3) {
@@ -306,12 +312,29 @@ void* applyCommands(void* socket){
                     RETURN_STATUS(TECNICOFS_ERROR_FILE_NOT_FOUND);
                 }
 
+                // Make sure we don't have a file descriptor for this file already
+                // and that we have room for one
+                int freeSlot = -1;
+                for (int i = 0; i < MAX_OPEN_FILES; i++) {
+                    if (openfiles[i] == iNumber) {
+                        LOCK_UNLOCK(fslock);
+                        RETURN_STATUS(TECNICOFS_ERROR_FILE_IS_OPEN);
+                    } else if (openfiles[i] < 0) {
+                        freeSlot = i;
+                    }
+                }
+
+                if (freeSlot < 0) {
+                    LOCK_UNLOCK(fslock);
+                    RETURN_STATUS(TECNICOFS_ERROR_MAXED_OPEN_FILES);
+                }
+
                 // Have we got the permissions required to open the file?
                 uid_t owner;
                 permission ownerPerms;
                 permission generalPerms;
 
-                if (inode_get(iNumber, &owner, &ownerPerms, &generalPerms, NULL, 0) < 0) {
+                if (inode_get(iNumber, NULL, &owner, &ownerPerms, &generalPerms, NULL, 0) < 0) {
                     LOCK_UNLOCK(fslock);
                     RETURN_STATUS(TECNICOFS_ERROR_OTHER);
                 }
@@ -330,10 +353,39 @@ void* applyCommands(void* socket){
                 }
 
                 // All checks passed, grant the file descriptor
+                if (inode_update_fd(iNumber, 1) < 0) {
+                    LOCK_UNLOCK(fslock);
+                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
+                }
+                openfiles[freeSlot] = iNumber;
 
                 LOCK_UNLOCK(fslock);
 
-                if (owner)
+                // Return the new fd
+                RETURN_STATUS(freeSlot);
+
+                break;
+            }
+            case 'x': // closes an open file (o fd)
+            {
+                // General syntax validation
+                if (numTokens != 2) {
+                    RETURN_STATUS(TECNICOFS_ERROR_INVALID_SYNTAX);
+                }
+
+                int fd = atoi(arg1);
+                if (fd < 0 || fd >= MAX_OPEN_FILES) {
+                    RETURN_STATUS(TECNICOFS_ERROR_INVALID_SYNTAX);
+                } else if (openfiles[fd] < 0) {
+                    // This filedescriptor wasn't linked to anything
+                    RETURN_STATUS(TECNICOFS_ERROR_FILE_NOT_OPEN);
+                }
+
+                // Update the filedescriptors
+                if (inode_update_fd(openfiles[fd], -1) < 0) {
+                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
+                }
+                openfiles[fd] = -1;
 
                 break;
             }
