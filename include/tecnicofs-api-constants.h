@@ -4,6 +4,8 @@
 
 typedef enum permission { NONE, WRITE, READ, RW } permission;
 
+#define MAX_OPEN_FILES 5
+
 /* Operation successful */
 #define TECNICOFS_OK 0
 

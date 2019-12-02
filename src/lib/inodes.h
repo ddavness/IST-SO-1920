@@ -11,6 +11,7 @@
 
 
 typedef struct inode_t {
+    int fileDescriptors;
     uid_t owner;
     permission ownerPermissions;
     permission othersPermissions;
