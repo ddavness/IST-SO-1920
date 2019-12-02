@@ -340,13 +340,13 @@ void* applyCommands(void* socket){
                 }
                 if (sock.userId != owner) {
                     // Apply general permissions
-                    if (!(mode & generalPerms)) {
+                    if ((mode & generalPerms) != mode) {
                         LOCK_UNLOCK(fslock);
                         RETURN_STATUS(TECNICOFS_ERROR_PERMISSION_DENIED);
                     }
                 } else {
                     // Apply owner permissions
-                    if (!(mode & ownerPerms)) {
+                    if ((mode & ownerPerms) != mode) {
                         LOCK_UNLOCK(fslock);
                         RETURN_STATUS(TECNICOFS_ERROR_PERMISSION_DENIED);
                     }
