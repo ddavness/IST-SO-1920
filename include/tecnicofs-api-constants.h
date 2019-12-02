@@ -29,9 +29,7 @@ typedef enum permission { NONE, WRITE, READ, RW } permission;
 #define TECNICOFS_ERROR_FILE_IS_OPEN -9
 /* File is open in the a mode that doesn't allow the operation */
 #define TECNICOFS_ERROR_INVALID_MODE -10
-/* Command has been emitted with bad syntax */
-#define TECNICOFS_ERROR_INVALID_SYNTAX -11
 /* Generic error */
-#define TECNICOFS_ERROR_OTHER -12
+#define TECNICOFS_ERROR_OTHER -11
 
 #endif /* TECNICOFS_API_CONSTANTS_H */
