@@ -96,6 +96,16 @@ void* applyCommands(void* args){
 
         int iNumber;
         switch (token) {
+            case 'p': // ping (p 0 0)
+            {
+                /*
+                    The goal is to make sure that the connection isn't going
+                    to be immediately dropped. Getting a TECNICOFS_OK (aka 0)
+                    from this command means the connection is secured.
+                */
+                RETURN_STATUS(TECNICOFS_OK);
+                break;
+            }
             case 'c': // creates a file (c filename perms)
             {
                 // General syntax validation

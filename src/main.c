@@ -84,8 +84,8 @@ void closesocket(int signal) {
     }
     errWrap(signal != SIGINT && signal != SIGTERM, "Unknown signal has been raised.");
     acceptingNewConnections = false;
-    errWrap(close(currentsocket.socket) < 0 && errno != ENOENT, "Unable to unlink socket!");
-    errWrap(unlink(socketname) < 0 && errno != ENOENT, "Unable to unlink socket!");
+    errWrap(close(currentsocket.socket) < 0, "Unable to unlink socket!");
+    errWrap(unlink(socketname) < 0, "Unable to unlink socket!");
 }
 
 void deletefork(void* forkptr) {
@@ -115,7 +115,6 @@ void deploy_threads(socket_t sock) {
             fork.userId
         );
 
-        // TODO Store this somewhere
         void* forkptr = malloc(sizeof(socket_t) + sizeof(tecnicofs));
         memcpy(forkptr, &fork, sizeof(socket_t));
         memcpy(

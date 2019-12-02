@@ -65,7 +65,7 @@ int tfsMount(char* address) {
         return TECNICOFS_ERROR_CONNECTION_ERROR;
     }
 
-    return TECNICOFS_OK;
+    return run("p 0 0", NULL, 0);
 }
 
 /*
