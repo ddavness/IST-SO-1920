@@ -12,6 +12,7 @@
 
 #include <errno.h>
 #include <unistd.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
@@ -46,12 +47,21 @@ socket_t newSocket(char* socketPath) {
     return sock;
 }
 
-socket_t acceptConnectionFrom(socket_t sock) {
+socket_t acceptConnectionFrom(socket_t sock, bool* acceptCondition) {
     socket_t fork;
     int fork_fd;
     socklen_t clientSize = (socklen_t)sizeof(sock.client);
 
-    errWrap((fork_fd = accept(sock.socket, (struct sockaddr *)sock.client, &clientSize)) < 0, "An error occurred while listening to incoming calls!");
+    errWrap((fork_fd = accept(sock.socket, (struct sockaddr *)sock.client, &clientSize)) < 0 && *acceptCondition, "An error occurred while listening to incoming calls!");
+    if (!*acceptCondition) {
+        fork.socket = -1;
+        fork.thread = NULL;
+        fork.client = NULL;
+        fork.server = NULL;
+        fork.procId = -1;
+        fork.userId = -1;
+        return fork;
+    }
     fork.socket = fork_fd;
     fork.thread = malloc(sizeof(pthread_t));
     fork.client = sock.client; // Fork will inherit the client information

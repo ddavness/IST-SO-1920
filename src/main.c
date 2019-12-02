@@ -13,6 +13,7 @@
 
 #define _GNU_SOURCE
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
@@ -39,6 +40,10 @@
 
 #include "cmd.h"
 #include "fs.h"
+
+bool acceptingNewConnections = true;
+char* socketname;
+socket_t currentsocket;
 
 int numberBuckets = 0;
 tecnicofs fs;
@@ -71,11 +76,25 @@ static void parseArgs (int argc, char** const argv){
     }
 }
 
+void closesocket(int signal) {
+    errWrap(signal != SIGINT && signal != SIGTERM, "Unknown signal has been raised.");
+    acceptingNewConnections = false;
+    errWrap(close(currentsocket.socket) < 0 && errno != ENOENT, "Unable to unlink socket!");
+    errWrap(unlink(socketname) < 0 && errno != ENOENT, "Unable to unlink socket!");
+}
+
 void deploy_threads(socket_t sock) {
+    signal(SIGINT, closesocket);
+    signal(SIGTERM, closesocket);
+
     socket_t fork;
-    while (true)
+    while (acceptingNewConnections)
     {
-        fork = acceptConnectionFrom(sock);
+        fork = acceptConnectionFrom(sock, &acceptingNewConnections);
+        if (!acceptingNewConnections) {
+            continue;
+        }
+
         printf("Connected!\nConnection details:\n %s %d\n %s %d\n",
             yellow_bold("> PID:"),
             fork.procId,
@@ -86,9 +105,15 @@ void deploy_threads(socket_t sock) {
         // TODO Store this somewhere
         void* forkptr = malloc(sizeof(socket_t) + sizeof(tecnicofs));
         memcpy(forkptr, &fork, sizeof(socket_t));
-        memcpy((void*)((intptr_t)forkptr + (intptr_t)sizeof(socket_t)), &fs, sizeof(tecnicofs));
+        memcpy(
+            (void*)((intptr_t)forkptr + (intptr_t)sizeof(socket_t)), // The zone following the socket
+            &fs,                                                     // The tecnicofs content
+            sizeof(tecnicofs)                                        // For how many bytes needed
+        );
         pthread_create(fork.thread, NULL, applyCommands, forkptr);
     }
+
+    printf(yellow_bold("\nTermination signal caught - No more connections accepted.\n"));
 }
 
 int main(int argc, char** argv) {
@@ -98,7 +123,8 @@ int main(int argc, char** argv) {
 
     inode_table_init();
     // Deploy our socket
-    socket_t socket = newSocket(argv[1]);
+    socketname = argv[1];
+    currentsocket = newSocket(socketname);
 
     struct timeval start, end;
 
@@ -106,7 +132,7 @@ int main(int argc, char** argv) {
     fs = new_tecnicofs(numberBuckets);
 
     gettimeofday(&start, NULL);
-    deploy_threads(socket);
+    deploy_threads(currentsocket);
 
     print_tecnicofs_tree(out, fs);
     fclose(out);

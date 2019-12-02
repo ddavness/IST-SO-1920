@@ -5,8 +5,9 @@
 
 */
 
-#include <sys/socket.h>
 #include <pthread.h>
+#include <stdbool.h>
+#include <sys/socket.h>
 
 #ifndef TECNICOFS_SOCKET_H
 #define TECNICOFS_SOCKET_H
@@ -40,11 +41,12 @@ socket_t newSocket(char*);
     Accepts and handles a new process connecting to the socket.
 
     socket_t socket: the socket you're accepting the call from.
+    bool* acceptCondition: a pointer to the condition that states whether to accept calls or not.
 
     Returns: the new thread that is handling the client.
 
     In case of error, the program automatically exits.
 */
-socket_t acceptConnectionFrom(socket_t);
+socket_t acceptConnectionFrom(socket_t, bool*);
 
 #endif
