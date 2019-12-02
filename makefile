@@ -15,7 +15,7 @@ LDFLAGS= -lm -pthread
 
 # A phony target is one that is not really the name of a file
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
-.PHONY: all clean remake
+.PHONY: all clean remake pkg
 
 all: tecnicofs-rwlock
 	mv tecnicofs-rwlock tecnicofs
@@ -80,9 +80,20 @@ out/inodes.o: src/lib/inodes.c src/lib/inodes.h
 # Misc
 
 clean:
-	@echo Cleaning...
 	rm -f out/*.o out/*.o tecnicofs-* tecnicofs
+	rm -rf client
+	rm -rf server
 
 remake:
 	make clean
 	make
+
+pkg:
+	make clean
+	mkdir -p server
+	mkdir -p server/out
+	cp -rf src/ server/
+	cp makefile server/
+	mkdir -p client
+	cp include/*.c include/*.h client/
+	zip -9 proj-so-ex3-g84.zip -r server/ client/
