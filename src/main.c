@@ -74,9 +74,14 @@ static void parseArgs (int argc, char** const argv){
     }
 }
 
-#define RETURN_STATUS(STATUS) *statuscode = STATUS; errWrap(send(sock.socket, statuscode, sizeof(int), 0) < 1, "Unable to deliver status code!"); continue
-
 void* applyCommands(void* socket){
+    #define RETURN_STATUS(STATUS) *statuscode = STATUS; errWrap(send(sock.socket, statuscode, sizeof(int), 0) < 1, "Unable to deliver status code!"); continue
+
+    typedef struct fd {
+        int inode;
+        permission mode;
+    } filed;
+
     sigset_t mask;
     sigemptyset(&mask);
     sigaddset(&mask, SIGINT);
@@ -86,11 +91,15 @@ void* applyCommands(void* socket){
 
     socket_t sock = *((socket_t*)socket);
     int statuscode[1];
-    int openfiles[MAX_OPEN_FILES] = {-1, -1, -1, -1, -1};
+    filed openfiles[MAX_OPEN_FILES];
     char command[MAX_INPUT_SIZE];
     char arg1[MAX_INPUT_SIZE];
     char arg2[MAX_INPUT_SIZE];
     char token;
+
+    for (int i = 0; i < MAX_OPEN_FILES; i++) {
+        openfiles[i].inode = -1;
+    }
 
     for (;;) {
         // Shallow-clean buffers
@@ -115,7 +124,7 @@ void* applyCommands(void* socket){
         int numTokens = sscanf(command, "%c %s %s", &token, arg1, arg2);
 
         if (numTokens != 3 && numTokens != 2) {
-            RETURN_STATUS(TECNICOFS_ERROR_INVALID_SYNTAX);
+            RETURN_STATUS(TECNICOFS_ERROR_OTHER);
         }
 
         int iNumber;
@@ -124,7 +133,7 @@ void* applyCommands(void* socket){
             {
                 // General syntax validation
                 if (numTokens != 3) {
-                    RETURN_STATUS(TECNICOFS_ERROR_INVALID_SYNTAX);
+                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
                 }
                 permission me = arg2[0] - '0';
                 permission others = arg2[1] - '0';
@@ -133,7 +142,7 @@ void* applyCommands(void* socket){
                     others < 0 || others > 3 ||
                     arg2[2] != '\0'
                 ) {
-                    RETURN_STATUS(TECNICOFS_ERROR_INVALID_SYNTAX);
+                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
                 }
 
                 lock* fslock = get_lock(fs, arg1);
@@ -164,7 +173,7 @@ void* applyCommands(void* socket){
             {
                 // General syntax validation
                 if (numTokens != 2) {
-                    RETURN_STATUS(TECNICOFS_ERROR_INVALID_SYNTAX);
+                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
                 }
 
                 lock* fslock = get_lock(fs, arg1);
@@ -204,7 +213,7 @@ void* applyCommands(void* socket){
             case 'r': // rename file (r old new)
             {
                 if (numTokens != 3) {
-                    RETURN_STATUS(TECNICOFS_ERROR_INVALID_SYNTAX);
+                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
                 }
 
                 lock* fslock = get_lock(fs, arg1);
@@ -294,12 +303,12 @@ void* applyCommands(void* socket){
             {
                 // General syntax validation
                 if (numTokens != 3) {
-                    RETURN_STATUS(TECNICOFS_ERROR_INVALID_SYNTAX);
+                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
                 }
 
                 permission mode = arg2[0] - '0';
                 if (mode < 1 || mode > 3 || arg2[1] != '\0') {
-                    RETURN_STATUS(TECNICOFS_ERROR_INVALID_SYNTAX);
+                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
                 }
 
                 lock* fslock = get_lock(fs, arg1);
@@ -316,10 +325,10 @@ void* applyCommands(void* socket){
                 // and that we have room for one
                 int freeSlot = -1;
                 for (int i = 0; i < MAX_OPEN_FILES; i++) {
-                    if (openfiles[i] == iNumber) {
+                    if (openfiles[i].inode == iNumber) {
                         LOCK_UNLOCK(fslock);
                         RETURN_STATUS(TECNICOFS_ERROR_FILE_IS_OPEN);
-                    } else if (openfiles[i] < 0) {
+                    } else if (openfiles[i].inode < 0 && freeSlot < 0) {
                         freeSlot = i;
                     }
                 }
@@ -357,7 +366,8 @@ void* applyCommands(void* socket){
                     LOCK_UNLOCK(fslock);
                     RETURN_STATUS(TECNICOFS_ERROR_OTHER);
                 }
-                openfiles[freeSlot] = iNumber;
+                openfiles[freeSlot].inode = iNumber;
+                openfiles[freeSlot].mode = mode;
 
                 LOCK_UNLOCK(fslock);
 
@@ -366,31 +376,85 @@ void* applyCommands(void* socket){
 
                 break;
             }
-            case 'x': // closes an open file (o fd)
+            case 'x': // closes an open file (x fd)
             {
                 // General syntax validation
                 if (numTokens != 2) {
-                    RETURN_STATUS(TECNICOFS_ERROR_INVALID_SYNTAX);
+                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
                 }
 
                 int fd = atoi(arg1);
                 if (fd < 0 || fd >= MAX_OPEN_FILES) {
-                    RETURN_STATUS(TECNICOFS_ERROR_INVALID_SYNTAX);
-                } else if (openfiles[fd] < 0) {
+                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
+                } else if (openfiles[fd].inode < 0) {
                     // This filedescriptor wasn't linked to anything
                     RETURN_STATUS(TECNICOFS_ERROR_FILE_NOT_OPEN);
                 }
 
                 // Update the filedescriptors
-                if (inode_update_fd(openfiles[fd], -1) < 0) {
+                if (inode_update_fd(openfiles[fd].inode, -1) < 0) {
                     RETURN_STATUS(TECNICOFS_ERROR_OTHER);
                 }
-                openfiles[fd] = -1;
+                openfiles[fd].inode = -1;
 
                 break;
             }
+            case 'l': // reads len bytes of a file (l fd len)
+            {
+                // General syntax validation
+                if (numTokens != 3) {
+                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
+                }
+
+                // Invalid arguments
+                int fd = atoi(arg1);
+                int len = atoi(arg2);
+                if (fd < 0 || fd >= MAX_OPEN_FILES || len <= 0) {
+                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
+                }
+
+                // Make sure our fd is valid
+                filed f = openfiles[fd];
+                if (f.inode < 0) {
+                    RETURN_STATUS(TECNICOFS_ERROR_FILE_NOT_OPEN);
+                }
+
+                // Make sure our fd is open in a valid mode
+                if (f.mode != READ && f.mode != RW) {
+                    RETURN_STATUS(TECNICOFS_ERROR_INVALID_MODE);
+                }
+
+                // Create our buffer: [iiii|c|c|c|c|c|...|c|c]
+                void* readBuffer = malloc(sizeof(int) + (len + 1) * sizeof(char));
+
+                int* status = readBuffer;
+                char* contents = readBuffer + sizeof(int);
+
+                // Copy the file contents to the buffer
+                int charsRead = inode_get(f.inode, NULL, NULL, NULL, NULL, contents, len);
+                if (charsRead < 0) {
+                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
+                }
+
+                // Perform required adjustments to the buffer
+                *status = charsRead;
+                readBuffer = realloc(readBuffer, sizeof(int) + (charsRead + 1) * sizeof(char));
+                size_t bufferSize = sizeof(int) + (charsRead + 1) * sizeof(char);
+
+                // Manually send this over to the client and return
+                errWrap(
+                    send(sock.socket, readBuffer, bufferSize, 0) < bufferSize,
+                    "Unable to send stuff over to client!"
+                );
+                continue;
+                break;
+            }
+            case 'w': // writes the message supplied to file (w fd msg)
+            {
+
+            }
             default: {
-                RETURN_STATUS(TECNICOFS_ERROR_INVALID_SYNTAX);
+                RETURN_STATUS(TECNICOFS_ERROR_OTHER);
                 break;
             }
         }
@@ -400,6 +464,8 @@ void* applyCommands(void* socket){
     }
 
     return NULL;
+
+    #undef RETURN_STATUS
 }
 
 void deploy_threads(socket_t sock) {
