@@ -35,14 +35,4 @@ ListNode* appendToList(RootNode*, void*);
 void removeFromList(RootNode*, ListNode*);
 void destroyLinkedList(RootNode*, void(void*));
 
-/* Hashing prototypes */
-int hashKey(char*);
-
-/* Hashtable abstraction function prototypes */
-RootNode** createHashTable();
-ListNode* findInHashTable(RootNode**, char*);
-ListNode* addToHashTable(RootNode**, char*, void*);
-void removeFromHashTable(RootNode**, ListNode*);
-void destroyHashTable(RootNode**, void(void*));
-
 #endif

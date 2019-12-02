@@ -22,7 +22,6 @@
 socket_t newSocket(char* socketPath) {
     socket_t sock;
     sockaddr* server = malloc(sizeof(sockaddr));
-    sockaddr* client = malloc(sizeof(sockaddr));
     fdesc socketfd;
     errWrap((socketfd = socket(AF_UNIX, SOCK_STREAM, 0)) <= 0, "Unable to create socket!");
     int err = unlink(socketPath);
@@ -30,7 +29,6 @@ socket_t newSocket(char* socketPath) {
 
     // Wipe all junk in the allocated memory
     memset(server, '\0', sizeof(*server));
-    memset(client, '\0', sizeof(*client));
 
     server -> sun_family = AF_UNIX;
     strcpy(server -> sun_path, socketPath);
@@ -41,7 +39,7 @@ socket_t newSocket(char* socketPath) {
     sock.procId = -1;
     sock.thread = NULL;
     sock.server = server;
-    sock.client = client;
+    sock.client = NULL;
 
     errWrap(listen(socketfd, MAX_PENDING_CALL_QUEUE), "Unable to listen to clients!");
     return sock;
@@ -51,9 +49,12 @@ socket_t acceptConnectionFrom(socket_t sock, bool* acceptCondition) {
     socket_t fork;
     int fork_fd;
     socklen_t clientSize = (socklen_t)sizeof(sock.client);
+    sockaddr* newclient = malloc(sizeof(sockaddr));
+    memset(newclient, '\0', sizeof(*newclient));
 
-    errWrap((fork_fd = accept(sock.socket, (struct sockaddr *)sock.client, &clientSize)) < 0 && *acceptCondition, "An error occurred while listening to incoming calls!");
+    errWrap((fork_fd = accept(sock.socket, (struct sockaddr *)newclient, &clientSize)) < 0 && *acceptCondition, "An error occurred while listening to incoming calls!");
     if (!*acceptCondition) {
+        free(newclient);
         fork.socket = -1;
         fork.thread = NULL;
         fork.client = NULL;
@@ -64,7 +65,7 @@ socket_t acceptConnectionFrom(socket_t sock, bool* acceptCondition) {
     }
     fork.socket = fork_fd;
     fork.thread = malloc(sizeof(pthread_t));
-    fork.client = sock.client; // Fork will inherit the client information
+    fork.client = newclient; // Fork will inherit the client information
     fork.server = NULL;
 
     struct ucred user;
@@ -72,11 +73,6 @@ socket_t acceptConnectionFrom(socket_t sock, bool* acceptCondition) {
     errWrap(getsockopt(fork_fd, SOL_SOCKET, SO_PEERCRED, &user, &usersize), "Failed to get user id!");
     fork.procId = user.pid;
     fork.userId = user.uid;
-
-    // Create another clean client address for the main socket
-    sockaddr* newclient = malloc(sizeof(sockaddr));
-    memset(newclient, '\0', sizeof(*newclient));
-    sock.client = newclient;
 
     return fork;
 }

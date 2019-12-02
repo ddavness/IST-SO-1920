@@ -33,6 +33,7 @@
 
 #include "lib/color.h"
 #include "lib/err.h"
+#include "lib/memutils.h"
 #include "lib/inodes.h"
 #include "lib/locks.h"
 #include "lib/socket.h"
@@ -44,6 +45,7 @@
 bool acceptingNewConnections = true;
 char* socketname;
 socket_t currentsocket;
+RootNode* connections;
 
 int numberBuckets = 0;
 tecnicofs fs;
@@ -83,6 +85,14 @@ void closesocket(int signal) {
     errWrap(unlink(socketname) < 0 && errno != ENOENT, "Unable to unlink socket!");
 }
 
+void deletefork(void* forkptr) {
+    socket_t* sock = forkptr;
+    pthread_join(*(sock -> thread), NULL);
+    free(sock -> client);
+    free(sock -> thread);
+    free(forkptr);
+}
+
 void deploy_threads(socket_t sock) {
     signal(SIGINT, closesocket);
     signal(SIGTERM, closesocket);
@@ -110,10 +120,13 @@ void deploy_threads(socket_t sock) {
             &fs,                                                     // The tecnicofs content
             sizeof(tecnicofs)                                        // For how many bytes needed
         );
-        pthread_create(fork.thread, NULL, applyCommands, forkptr);
+        appendToList(connections, forkptr);
+        pthread_create(((socket_t*)forkptr) -> thread, NULL, applyCommands, forkptr);
     }
 
     printf(yellow_bold("\nTermination signal caught - No more connections accepted.\n"));
+    destroyLinkedList(connections, deletefork);
+    free(sock.server);
 }
 
 int main(int argc, char** argv) {
@@ -122,6 +135,7 @@ int main(int argc, char** argv) {
     errWrap((out = fopen(argv[2], "w")) == NULL, "Unable to create/open output file!");
 
     inode_table_init();
+    connections = createLinkedList();
     // Deploy our socket
     socketname = argv[1];
     currentsocket = newSocket(socketname);
