@@ -114,39 +114,46 @@ void* applyCommands(void* socket){
         int numTokens = sscanf(command, "%c %s %s", &token, arg1, arg2);
 
         if (numTokens != 3 && numTokens != 2) {
-            fprintf(stderr, "%s '%s'\n", red("Caught invalid command:"), command);
-            RETURN_STATUS(TECNICOFS_ERROR_OTHER);
-            continue;
+            RETURN_STATUS(TECNICOFS_ERROR_INVALID_SYNTAX);
         }
 
         int iNumber;
         switch (token) {
             case 'c': // creates a file (c filename perms)
             {
-                int me = arg2[0] - '0';
-                int others = arg2[1] - '0';
+                // General syntax validation
+                if (numTokens != 3) {
+                    RETURN_STATUS(TECNICOFS_ERROR_INVALID_SYNTAX);
+                }
+                permission me = arg2[0] - '0';
+                permission others = arg2[1] - '0';
                 if (
                     me < 0 || me > 3 ||
                     others < 0 || others > 3 ||
                     arg2[2] != '\0'
                 ) {
-                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
+                    RETURN_STATUS(TECNICOFS_ERROR_INVALID_SYNTAX);
                 }
 
                 lock* fslock = get_lock(fs, arg1);
                 LOCK_WRITE(fslock);
-                iNumber = inode_create(sock.userId, me, others);
-                if (iNumber < 0) {
-                    // inode table is full
-                    LOCK_UNLOCK(fslock);
-                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
-                }
+
+                // Does the file exist already?
                 if (lookup(fs, arg1) >= 0) {
                     printf("'%s' already exists.\n", arg1);
-                    LOCK_UNLOCK(fslock);
+                    LOCK_UNLOCK(fslock);;
                     RETURN_STATUS(TECNICOFS_ERROR_FILE_ALREADY_EXISTS);
                 }
 
+                // Get our iNumber
+                iNumber = inode_create(sock.userId, me, others);
+                if (iNumber < 0) {
+                    // iNode table is full
+                    LOCK_UNLOCK(fslock);
+                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
+                }
+
+                // All checks passed, insert the file in the filesystem
                 create(fs, arg1, iNumber);
                 LOCK_UNLOCK(fslock);
 
@@ -154,16 +161,24 @@ void* applyCommands(void* socket){
             }
             case 'd': // delete file (d filename)
             {
+                // General syntax validation
+                if (numTokens != 2) {
+                    RETURN_STATUS(TECNICOFS_ERROR_INVALID_SYNTAX);
+                }
+
                 lock* fslock = get_lock(fs, arg1);
                 LOCK_WRITE(fslock);
 
+                // Make sure the file does exist
                 iNumber = lookup(fs, arg1);
                 if (iNumber < 0) {
                     LOCK_UNLOCK(fslock);
                     RETURN_STATUS(TECNICOFS_ERROR_FILE_NOT_FOUND);
                 }
+
+                // Make sure the we are the actual owner of the file
                 uid_t owner;
-                if (inode_get(iNumber, &owner, NULL, NULL, NULL, 0)) {
+                if (inode_get(iNumber, &owner, NULL, NULL, NULL, 0) < 0) {
                     LOCK_UNLOCK(fslock);
                     RETURN_STATUS(TECNICOFS_ERROR_OTHER);
                 }
@@ -171,6 +186,8 @@ void* applyCommands(void* socket){
                     LOCK_UNLOCK(fslock);
                     RETURN_STATUS(TECNICOFS_ERROR_PERMISSION_DENIED);
                 }
+
+                // All checks passed, delete the file
 
                 inode_delete(iNumber);
                 delete(fs, arg1);
@@ -180,20 +197,27 @@ void* applyCommands(void* socket){
             }
             case 'r': // rename file (r old new)
             {
+                if (numTokens != 3) {
+                    RETURN_STATUS(TECNICOFS_ERROR_INVALID_SYNTAX);
+                }
+
                 lock* fslock = get_lock(fs, arg1);
                 lock* tglock = get_lock(fs, arg2);
 
                 if (fslock == tglock) {
-                    // We can simply rename in the tree
+                    // Both names point to the same bucket
                     LOCK_WRITE(fslock);
 
+                    // Make sure the file we're moving exists
                     iNumber = lookup(fs, arg1);
                     if (iNumber < 0) {
                         LOCK_UNLOCK(fslock);
                         RETURN_STATUS(TECNICOFS_ERROR_FILE_NOT_FOUND);
                     }
+
+                    // Make sure we own the file we're moving
                     uid_t owner;
-                    if (inode_get(iNumber, &owner, NULL, NULL, NULL, 0)) {
+                    if (inode_get(iNumber, &owner, NULL, NULL, NULL, 0) < 0) {
                         LOCK_UNLOCK(fslock);
                         RETURN_STATUS(TECNICOFS_ERROR_OTHER);
                     }
@@ -201,12 +225,14 @@ void* applyCommands(void* socket){
                         LOCK_UNLOCK(fslock);
                         RETURN_STATUS(TECNICOFS_ERROR_PERMISSION_DENIED);
                     }
-                    int targetFile = lookup(fs, arg2);
+                    int targetFileiNumber = lookup(fs, arg2);
 
-                    if (targetFile < 0) {
+                    if (targetFileiNumber < 0) {
+                        // Grant the rename
                         delete(fs, arg1);
                         create(fs, arg2, iNumber);
                     } else {
+                        // The name we want is taken
                         LOCK_UNLOCK(fslock);
                         RETURN_STATUS(TECNICOFS_ERROR_FILE_ALREADY_EXISTS);
                     }
@@ -219,6 +245,7 @@ void* applyCommands(void* socket){
                         fslock = tglock;
                         tglock = tmp;
                     }
+                    // Do the same steps as above except with both locks
                     // Lock both threes, delete on origin, create on target
                     LOCK_WRITE(fslock);
                     LOCK_WRITE(tglock);
@@ -230,7 +257,7 @@ void* applyCommands(void* socket){
                         RETURN_STATUS(TECNICOFS_ERROR_FILE_NOT_FOUND);
                     }
                     uid_t owner;
-                    if (inode_get(iNumber, &owner, NULL, NULL, NULL, 0)) {
+                    if (inode_get(iNumber, &owner, NULL, NULL, NULL, 0) < 0) {
                         LOCK_UNLOCK(tglock);
                         LOCK_UNLOCK(fslock);
                         RETURN_STATUS(TECNICOFS_ERROR_OTHER);
@@ -257,21 +284,61 @@ void* applyCommands(void* socket){
 
                 break;
             }
-            /*case 'l': // reads from an open file (l fd)
-                LOCK_READ(fslock);
-                searchResult = lookup(fs, arg1);
-
-                if (!searchResult) {
-                    printf("%s not found\n", arg1);
-                } else {
-                    printf("%s found with inumber %d\n", arg1, searchResult);
+            case 'o': // reads from an open file (o filename mode)
+            {
+                // General syntax validation
+                if (numTokens != 3) {
+                    RETURN_STATUS(TECNICOFS_ERROR_INVALID_SYNTAX);
                 }
+
+                permission mode = arg2[0] - '0';
+                if (mode < 1 || mode > 3 || arg2[1] != '\0') {
+                    RETURN_STATUS(TECNICOFS_ERROR_INVALID_SYNTAX);
+                }
+
+                lock* fslock = get_lock(fs, arg1);
+                LOCK_READ(fslock);
+
+                // Does the file we want to open actually exist?
+                iNumber = lookup(fs, arg1);
+                if (iNumber < 0) {
+                    LOCK_UNLOCK(fslock);
+                    RETURN_STATUS(TECNICOFS_ERROR_FILE_NOT_FOUND);
+                }
+
+                // Have we got the permissions required to open the file?
+                uid_t owner;
+                permission ownerPerms;
+                permission generalPerms;
+
+                if (inode_get(iNumber, &owner, &ownerPerms, &generalPerms, NULL, 0) < 0) {
+                    LOCK_UNLOCK(fslock);
+                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
+                }
+                if (sock.userId != owner) {
+                    // Apply general permissions
+                    if (!(mode & generalPerms)) {
+                        LOCK_UNLOCK(fslock);
+                        RETURN_STATUS(TECNICOFS_ERROR_PERMISSION_DENIED);
+                    }
+                } else {
+                    // Apply owner permissions
+                    if (!(mode & ownerPerms)) {
+                        LOCK_UNLOCK(fslock);
+                        RETURN_STATUS(TECNICOFS_ERROR_PERMISSION_DENIED);
+                    }
+                }
+
+                // All checks passed, grant the file descriptor
+
                 LOCK_UNLOCK(fslock);
 
-                break;*/
+                if (owner)
+
+                break;
+            }
             default: {
-                fprintf(stderr, "%s '%s'\n", red("Caught invalid command:"), command);
-                RETURN_STATUS(TECNICOFS_ERROR_OTHER);
+                RETURN_STATUS(TECNICOFS_ERROR_INVALID_SYNTAX);
                 break;
             }
         }
