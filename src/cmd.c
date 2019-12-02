@@ -275,8 +275,9 @@ void* applyCommands(void* args){
 
                 // Does the file we want to open actually exist?
                 iNumber = lookup(fs, arg1);
+                LOCK_UNLOCK(fslock);
+
                 if (iNumber < 0) {
-                    LOCK_UNLOCK(fslock);
                     RETURN_STATUS(TECNICOFS_ERROR_FILE_NOT_FOUND);
                 }
 
@@ -285,7 +286,6 @@ void* applyCommands(void* args){
                 int freeSlot = -1;
                 for (int i = 0; i < MAX_OPEN_FILES; i++) {
                     if (openfiles[i].inode == iNumber) {
-                        LOCK_UNLOCK(fslock);
                         RETURN_STATUS(TECNICOFS_ERROR_FILE_IS_OPEN);
                     } else if (openfiles[i].inode < 0 && freeSlot < 0) {
                         freeSlot = i;
@@ -293,7 +293,6 @@ void* applyCommands(void* args){
                 }
 
                 if (freeSlot < 0) {
-                    LOCK_UNLOCK(fslock);
                     RETURN_STATUS(TECNICOFS_ERROR_MAXED_OPEN_FILES);
                 }
 
@@ -303,32 +302,26 @@ void* applyCommands(void* args){
                 permission generalPerms;
 
                 if (inode_get(iNumber, NULL, &owner, &ownerPerms, &generalPerms, NULL, 0) < 0) {
-                    LOCK_UNLOCK(fslock);
                     RETURN_STATUS(TECNICOFS_ERROR_OTHER);
                 }
                 if (sock.userId != owner) {
                     // Apply general permissions
                     if ((mode & generalPerms) != mode) {
-                        LOCK_UNLOCK(fslock);
                         RETURN_STATUS(TECNICOFS_ERROR_PERMISSION_DENIED);
                     }
                 } else {
                     // Apply owner permissions
                     if ((mode & ownerPerms) != mode) {
-                        LOCK_UNLOCK(fslock);
                         RETURN_STATUS(TECNICOFS_ERROR_PERMISSION_DENIED);
                     }
                 }
 
                 // All checks passed, grant the file descriptor
                 if (inode_update_fd(iNumber, 1) < 0) {
-                    LOCK_UNLOCK(fslock);
                     RETURN_STATUS(TECNICOFS_ERROR_OTHER);
                 }
                 openfiles[freeSlot].inode = iNumber;
                 openfiles[freeSlot].mode = mode;
-
-                LOCK_UNLOCK(fslock);
 
                 // Return the new fd
                 RETURN_STATUS(freeSlot);
