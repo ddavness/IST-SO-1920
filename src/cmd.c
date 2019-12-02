@@ -74,6 +74,14 @@ void* applyCommands(void* args){
             // Client unmounted
             printf("Client hung up, exiting...\n");
             errWrap(close(sock.socket), "Unable to close socket fdescriptor!");
+            // Internal cleanup
+            for (int i = 0; i < MAX_OPEN_FILES; i++) {
+                filed f = openfiles[i];
+                if (f.inode >= 0) {
+                    inode_update_fd(f.inode, -1);
+                }
+            }
+
             pthread_exit(NULL);
             return NULL;
         }
