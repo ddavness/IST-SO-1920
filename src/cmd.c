@@ -11,6 +11,7 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include <unistd.h>
 
 #include <sys/types.h>
@@ -24,7 +25,8 @@
 #include "fs.h"
 
 #define RETURN_STATUS(STATUS) *statuscode = STATUS; errWrap(send(sock.socket, statuscode, sizeof(int), 0) < 1, "Unable to deliver status code!"); continue
-#define MAX_INPUT_SIZE 1024
+#define NOMINAL_BUFFER_SIZE 1024
+#define GLOBAL_BUFFER_SIZE 3 + NOMINAL_BUFFER_SIZE * 2
 
 typedef struct fd {
     int inode;
@@ -45,9 +47,13 @@ void* applyCommands(void* args){
     int statuscode[1];
     filed openfiles[MAX_OPEN_FILES];
 
-    char command[MAX_INPUT_SIZE];
-    char arg1[MAX_INPUT_SIZE];
-    char arg2[MAX_INPUT_SIZE];
+    // = MAX_INPUT_SIZE for arg1 & arg2, then
+    // 2 chars for the spaces between args,
+    // and finally the command token itself.
+    char command[GLOBAL_BUFFER_SIZE];
+
+    char arg1[NOMINAL_BUFFER_SIZE];
+    char arg2[NOMINAL_BUFFER_SIZE];
     char token;
 
     for (int i = 0; i < MAX_OPEN_FILES; i++) {
@@ -60,7 +66,7 @@ void* applyCommands(void* args){
         arg1[0] = '\0';
         arg2[0] = '\0';
 
-        int success = read(sock.socket, command, MAX_INPUT_SIZE);
+        int success = read(sock.socket, command, GLOBAL_BUFFER_SIZE);
 
         // Sanity verification block
         errWrap(success < 0, "Error reading commands!");
@@ -359,7 +365,7 @@ void* applyCommands(void* args){
                     RETURN_STATUS(TECNICOFS_ERROR_OTHER);
                 }
 
-                // Invalid arguments
+                // Make sure arguments are valid
                 int fd = atoi(arg1);
                 int len = atoi(arg2);
                 if (fd < 0 || fd >= MAX_OPEN_FILES || len <= 0) {
@@ -405,6 +411,32 @@ void* applyCommands(void* args){
             case 'w': // writes the message supplied to file (w fd msg)
             {
                 // General validation syntax
+                if (numTokens != 3) {
+                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
+                }
+
+                // Validate file descriptor
+                int fd = atoi(arg1);
+                if (fd < 0 || fd >= MAX_OPEN_FILES) {
+                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
+                }
+
+                filed f = openfiles[fd];
+                if (f.inode < 0) {
+                    RETURN_STATUS(TECNICOFS_ERROR_FILE_NOT_OPEN);
+                }
+                if (f.mode != WRITE && f.mode != RW) {
+                    RETURN_STATUS(TECNICOFS_ERROR_INVALID_MODE);
+                }
+
+                // We can assume the message is complete
+                // (aka buffer is large enough)
+
+                if (inode_set(f.inode, arg2, strlen(arg2)) < 0) {
+                    RETURN_STATUS(TECNICOFS_ERROR_OTHER);
+                }
+
+                break;
             }
             default: {
                 RETURN_STATUS(TECNICOFS_ERROR_OTHER);
