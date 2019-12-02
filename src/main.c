@@ -79,6 +79,9 @@ static void parseArgs (int argc, char** const argv){
 }
 
 void closesocket(int signal) {
+    if (!acceptingNewConnections) {
+        return;
+    }
     errWrap(signal != SIGINT && signal != SIGTERM, "Unknown signal has been raised.");
     acceptingNewConnections = false;
     errWrap(close(currentsocket.socket) < 0 && errno != ENOENT, "Unable to unlink socket!");

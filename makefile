@@ -10,7 +10,7 @@ LD = gcc
 SRC = src/
 OUT = out/
 
-CFLAGS = -g -pedantic -Wextra -Wall -std=gnu99 -I../
+CFLAGS = -g -pedantic -Werror -Wall -std=gnu99 -I../
 LDFLAGS= -lm -pthread
 
 # A phony target is one that is not really the name of a file
