@@ -169,7 +169,7 @@ int tfsClose(int fd) {
 int tfsRead(int fd, char *buffer, int len) {
     void* out = malloc(sizeof(int) + len * sizeof(char));
     char* cmd = malloc(6 * sizeof(char));
-    sprintf(cmd, "r %d %d", fd, len);
+    sprintf(cmd, "l %d %d", fd, len);
     int result = run(cmd, out, sizeof(int) + len * sizeof(char));
     strcpy(buffer, (char*)((intptr_t)out + (intptr_t)sizeof(int)));
     free(out);

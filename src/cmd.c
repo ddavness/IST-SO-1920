@@ -384,20 +384,20 @@ void* applyCommands(void* args){
                 }
 
                 // Create our buffer: [iiii|c|c|c|c|c|...|c|c]
-                void* readBuffer = malloc(sizeof(int) + (len + 1) * sizeof(char));
+                void* readBuffer = malloc(sizeof(int) + len * sizeof(char));
 
                 int* status = readBuffer;
                 char* contents = (char*)((intptr_t)readBuffer + (intptr_t)sizeof(int));
 
                 // Copy the file contents to the buffer
                 int charsRead = inode_get(f.inode, NULL, NULL, NULL, NULL, contents, len);
+                printf("%d\n", charsRead);
                 if (charsRead < 0) {
                     RETURN_STATUS(TECNICOFS_ERROR_OTHER);
                 }
 
                 // Perform required adjustments to the buffer
                 *status = charsRead;
-                readBuffer = realloc(readBuffer, sizeof(int) + (charsRead + 1) * sizeof(char));
                 ssize_t bufferSize = sizeof(int) + (charsRead + 1) * sizeof(char);
 
                 // Manually send this over to the client and return
@@ -405,6 +405,8 @@ void* applyCommands(void* args){
                     send(sock.socket, readBuffer, bufferSize, 0) < bufferSize,
                     "Unable to send stuff over to client!"
                 );
+
+                free(readBuffer);
                 continue;
                 break;
             }

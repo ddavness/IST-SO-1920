@@ -152,8 +152,10 @@ int inode_get(int inumber, int* numFilesOpen, uid_t *owner, permission *ownerPer
         *othersPerm = inode_table[inumber].othersPermissions;
 
     if(fileContents && len > 0 && inode_table[inumber].fileContent){
-        strncpy(fileContents, inode_table[inumber].fileContent, len);
-        fileContents[len] = '\0';
+        if(len > ((int) strlen(inode_table[inumber].fileContent)) + 1)
+            len = ((int) strlen(inode_table[inumber].fileContent) + 1);
+        strncpy(fileContents, inode_table[inumber].fileContent, len-1);
+        fileContents[len-1] = '\0';
         unlock_inode_table();
         return strlen(fileContents);
     }
