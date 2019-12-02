@@ -22,11 +22,11 @@ all: tecnicofs-rwlock
 
 # Final Program set
 
-tecnicofs-mutex: out/bst.o out/err.o out/locks-mutex.o out/socket.o out/fs-mutex.o out/hash.o out/inodes.o out/cmd-mutex.o out/main-mutex.o
-	$(LD) $(LDFLAGS) -o tecnicofs-mutex out/bst.o out/err.o out/socket.o out/fs-mutex.o out/locks-mutex.o out/hash.o out/inodes.o out/cmd-mutex.o out/main-mutex.o
+tecnicofs-mutex: out/memutils.o out/bst.o out/err.o out/locks-mutex.o out/socket.o out/fs-mutex.o out/hash.o out/inodes.o out/cmd-mutex.o out/main-mutex.o
+	$(LD) $(LDFLAGS) -o tecnicofs-mutex out/memutils.o out/bst.o out/err.o out/socket.o out/fs-mutex.o out/locks-mutex.o out/hash.o out/inodes.o out/cmd-mutex.o out/main-mutex.o
 
-tecnicofs-rwlock: out/bst.o out/err.o out/locks-rwlock.o out/socket.o out/fs-rwlock.o out/hash.o out/inodes.o out/cmd-rwlock.o out/main-rwlock.o
-	$(LD) $(LDFLAGS) -o tecnicofs-rwlock out/bst.o out/err.o out/socket.o out/fs-rwlock.o out/locks-rwlock.o out/hash.o out/inodes.o out/cmd-rwlock.o out/main-rwlock.o
+tecnicofs-rwlock: out/memutils.o out/bst.o out/err.o out/locks-rwlock.o out/socket.o out/fs-rwlock.o out/hash.o out/inodes.o out/cmd-rwlock.o out/main-rwlock.o
+	$(LD) $(LDFLAGS) -o tecnicofs-rwlock out/memutils.o out/bst.o out/err.o out/socket.o out/fs-rwlock.o out/locks-rwlock.o out/hash.o out/inodes.o out/cmd-rwlock.o out/main-rwlock.o
 
 # Main variations (Mutex, RWLock)
 
@@ -61,6 +61,9 @@ out/locks-rwlock.o: src/lib/locks.c src/lib/locks.h
 	$(CC) $(CFLAGS) -DRWLOCK -o out/locks-rwlock.o -c src/lib/locks.c
 
 # Dependencies
+
+out/memutils.o: src/lib/memutils.c src/lib/memutils.h
+	$(CC) $(CFLAGS) -o out/memutils.o -c src/lib/memutils.c
 
 out/socket.o: src/lib/socket.c src/lib/socket.h
 	$(CC) $(CFLAGS) -o out/socket.o -c src/lib/socket.c
