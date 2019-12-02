@@ -10,11 +10,13 @@
 #include <pthread.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <unistd.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#include "lib/err.h"
 #include "lib/socket.h"
 #include "lib/inodes.h"
 #include "lib/tecnicofs-api-constants.h"
@@ -37,8 +39,8 @@ void* applyCommands(void* args){
 
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
 
-    socket_t sock = *((socket_t*)socket);
-    tecnicofs fs = *((tecnicofs*)socket + sizeof(socket_t));
+    socket_t sock = *((socket_t*)args);
+    tecnicofs fs = *((tecnicofs*)((intptr_t)args + (intptr_t)sizeof(socket_t)));
 
     int statuscode[1];
     filed openfiles[MAX_OPEN_FILES];
@@ -379,7 +381,7 @@ void* applyCommands(void* args){
                 void* readBuffer = malloc(sizeof(int) + (len + 1) * sizeof(char));
 
                 int* status = readBuffer;
-                char* contents = readBuffer + sizeof(int);
+                char* contents = (char*)((intptr_t)readBuffer + (intptr_t)sizeof(int));
 
                 // Copy the file contents to the buffer
                 int charsRead = inode_get(f.inode, NULL, NULL, NULL, NULL, contents, len);
@@ -390,7 +392,7 @@ void* applyCommands(void* args){
                 // Perform required adjustments to the buffer
                 *status = charsRead;
                 readBuffer = realloc(readBuffer, sizeof(int) + (charsRead + 1) * sizeof(char));
-                size_t bufferSize = sizeof(int) + (charsRead + 1) * sizeof(char);
+                ssize_t bufferSize = sizeof(int) + (charsRead + 1) * sizeof(char);
 
                 // Manually send this over to the client and return
                 errWrap(

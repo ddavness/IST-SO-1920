@@ -4,6 +4,7 @@ vgcore.*
 *.txt
 
 # Binary executables and object code - they're useless for the delivery!
+tecnicofs
 tecnicofs-*
 !tecnicofs-*.h
 !tecnicofs-*.c

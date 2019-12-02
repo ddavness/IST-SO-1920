@@ -10,7 +10,7 @@ LD = gcc
 SRC = src/
 OUT = out/
 
-CFLAGS = -g -pedantic -Wextra -Wall -Werror -std=gnu99 -I../
+CFLAGS = -g -pedantic -Wextra -Wall -std=gnu99 -I../
 LDFLAGS= -lm -pthread
 
 # A phony target is one that is not really the name of a file
@@ -18,14 +18,15 @@ LDFLAGS= -lm -pthread
 .PHONY: all clean remake
 
 all: tecnicofs-rwlock
+	mv tecnicofs-rwlock tecnicofs
 
 # Final Program set
 
-tecnicofs-mutex: out/bst.o out/err.o out/locks-mutex.o out/socket.o out/fs-mutex.o out/hash.o out/inodes.o out/main-mutex.o
-	$(LD) $(LDFLAGS) -o tecnicofs-mutex out/bst.o out/err.o out/socket.o out/fs-mutex.o out/locks-mutex.o out/hash.o out/inodes.o out/main-mutex.o
+tecnicofs-mutex: out/bst.o out/err.o out/locks-mutex.o out/socket.o out/fs-mutex.o out/hash.o out/inodes.o out/cmd-mutex.o out/main-mutex.o
+	$(LD) $(LDFLAGS) -o tecnicofs-mutex out/bst.o out/err.o out/socket.o out/fs-mutex.o out/locks-mutex.o out/hash.o out/inodes.o out/cmd-mutex.o out/main-mutex.o
 
-tecnicofs-rwlock: out/bst.o out/err.o out/locks-rwlock.o out/socket.o out/fs-rwlock.o out/hash.o out/inodes.o out/main-rwlock.o
-	$(LD) $(LDFLAGS) -o tecnicofs-rwlock out/bst.o out/err.o out/socket.o out/fs-rwlock.o out/locks-rwlock.o out/hash.o out/inodes.o out/main-rwlock.o
+tecnicofs-rwlock: out/bst.o out/err.o out/locks-rwlock.o out/socket.o out/fs-rwlock.o out/hash.o out/inodes.o out/cmd-rwlock.o out/main-rwlock.o
+	$(LD) $(LDFLAGS) -o tecnicofs-rwlock out/bst.o out/err.o out/socket.o out/fs-rwlock.o out/locks-rwlock.o out/hash.o out/inodes.o out/cmd-rwlock.o out/main-rwlock.o
 
 # Main variations (Mutex, RWLock)
 
@@ -35,7 +36,15 @@ out/main-mutex.o: src/main.c src/fs.h src/lib/bst.h src/lib/color.h src/lib/lock
 out/main-rwlock.o: src/main.c src/fs.h src/lib/bst.h src/lib/color.h src/lib/locks.h src/lib/socket.h
 	$(CC) $(CFLAGS) -DRWLOCK -o out/main-rwlock.o -c src/main.c
 
-# Sync variations
+# applyCommands() variations
+
+out/cmd-mutex.o: src/cmd.c src/lib/err.c src/lib/inodes.c src/lib/socket.c
+	$(CC) $(CFLAGS) -DMUTEX -o out/cmd-mutex.o -c src/cmd.c
+
+out/cmd-rwlock.o: src/cmd.c src/lib/err.c src/lib/inodes.c src/lib/socket.c
+	$(CC) $(CFLAGS) -DRWLOCK -o out/cmd-rwlock.o -c src/cmd.c
+
+# FS variations
 
 out/fs-mutex.o: src/fs.c src/fs.h src/lib/bst.h
 	$(CC) $(CFLAGS) -DMUTEX -o out/fs-mutex.o -c src/fs.c
@@ -72,7 +81,7 @@ out/inodes.o: src/lib/inodes.c src/lib/inodes.h
 
 clean:
 	@echo Cleaning...
-	rm -f out/*.o out/*.o tecnicofs-*
+	rm -f out/*.o out/*.o tecnicofs-* tecnicofs
 
 remake:
 	make clean

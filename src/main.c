@@ -84,9 +84,9 @@ void deploy_threads(socket_t sock) {
         );
 
         // TODO Store this somewhere
-        socket_t* forkptr = malloc(sizeof(socket_t) + sizeof(tecnicofs));
+        void* forkptr = malloc(sizeof(socket_t) + sizeof(tecnicofs));
         memcpy(forkptr, &fork, sizeof(socket_t));
-        memcpy(forkptr + sizeof(socket_t), &fs, sizeof(tecnicofs));
+        memcpy((void*)((intptr_t)forkptr + (intptr_t)sizeof(socket_t)), &fs, sizeof(tecnicofs));
         pthread_create(fork.thread, NULL, applyCommands, forkptr);
     }
 }
