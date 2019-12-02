@@ -18,10 +18,14 @@
 #include "tecnicofs-api-constants.h"
 #include "tecnicofs-client-api.h"
 
+#define NOMINAL_BUFFER_SIZE 1024
+#define GLOBAL_BUFFER_SIZE 3 + NOMINAL_BUFFER_SIZE * 2
+
 typedef struct sockaddr_un sockaddr;
 
 int currentSocketFD = 0;
 int statuscode[1];
+char cmd[GLOBAL_BUFFER_SIZE];
 
 /*
     Internal function that sends a command to the tecnicofs server.
@@ -92,11 +96,8 @@ int tfsUnmount() {
     - Error code, otherwise.
 */
 int tfsCreate(char *filename, permission ownerPermissions, permission othersPermissions) {
-    char* cmd = malloc((strlen(filename) + 6) * sizeof(char));
     sprintf(cmd, "c %s %d%d", filename, ownerPermissions, othersPermissions);
-    int result = run(cmd, NULL, 0);
-    free(cmd);
-    return result;
+    return run(cmd, NULL, 0);
 }
 
 /*
@@ -107,11 +108,8 @@ int tfsCreate(char *filename, permission ownerPermissions, permission othersPerm
     - Error code, otherwise.
 */
 int tfsDelete(char *filename) {
-    char* cmd = malloc((strlen(filename) + 3) * sizeof(char));
     sprintf(cmd, "d %s", filename);
-    int result = run(cmd, NULL, 0);
-    free(cmd);
-    return result;
+    return run(cmd, NULL, 0);
 }
 
 /*
@@ -122,11 +120,8 @@ int tfsDelete(char *filename) {
     - Error code, otherwise.
 */
 int tfsRename(char *filenameOld, char *filenameNew) {
-    char* cmd = malloc((strlen(filenameOld) + strlen(filenameNew) + 4) * sizeof(char));
     sprintf(cmd, "r %s %s", filenameOld, filenameNew);
-    int result = run(cmd, NULL, 0);
-    free(cmd);
-    return result;
+    return run(cmd, NULL, 0);
 }
 
 /*
@@ -137,11 +132,8 @@ int tfsRename(char *filenameOld, char *filenameNew) {
     - Error code, otherwise.
 */
 int tfsOpen(char *filename, permission mode) {
-    char* cmd = malloc((strlen(filename) + 5) * sizeof(char));
     sprintf(cmd, "o %s %d", filename, mode);
-    int result = run(cmd, NULL, 0);
-    free(cmd);
-    return result;
+    return run(cmd, NULL, 0);
 }
 
 /*
@@ -152,11 +144,8 @@ int tfsOpen(char *filename, permission mode) {
     - Error code, otherwise.
 */
 int tfsClose(int fd) {
-    char* cmd = malloc(4 * sizeof(char));
     sprintf(cmd, "x %d", fd);
-    int result = run(cmd, NULL, 0);
-    free(cmd);
-    return result;
+    return run(cmd, NULL, 0);
 }
 
 /*
@@ -168,12 +157,10 @@ int tfsClose(int fd) {
 */
 int tfsRead(int fd, char *buffer, int len) {
     void* out = malloc(sizeof(int) + len * sizeof(char));
-    char* cmd = malloc(6 * sizeof(char));
     sprintf(cmd, "l %d %d", fd, len);
     int result = run(cmd, out, sizeof(int) + len * sizeof(char));
     strcpy(buffer, (char*)((intptr_t)out + (intptr_t)sizeof(int)));
     free(out);
-    free(cmd);
     return result;
 }
 
@@ -185,9 +172,6 @@ int tfsRead(int fd, char *buffer, int len) {
     - Error code, otherwise.
 */
 int tfsWrite(int fd, char *buffer, int len) {
-    char* cmd = malloc((strlen(buffer) + 5) * sizeof(char));
     sprintf(cmd, "w %d %s", fd, buffer);
-    int result = run(cmd, NULL, 0);
-    free(cmd);
-    return result;
+    return run(cmd, NULL, 0);
 }

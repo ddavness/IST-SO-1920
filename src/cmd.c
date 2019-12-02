@@ -86,8 +86,6 @@ void* applyCommands(void* args){
             return NULL;
         }
 
-        printf("'%s'\n", command);
-
         int numTokens = sscanf(command, "%c %s %s", &token, arg1, arg2);
 
         if (numTokens != 3 && numTokens != 2) {
