@@ -1,0 +1,6 @@
+c a
+c b
+l a
+p 3
+l b
+l c
