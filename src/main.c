@@ -133,6 +133,7 @@ void feedInput(FILE* input){
         switch (token) {
             case 'c':
             case 'l':
+            case 'p':
             case 'd':
                 if (numTokens == 2) {
                     insertCommand(line);
@@ -217,6 +218,24 @@ void* applyCommands(){
         int searchResult;
         int iNumber;
         switch (token) {
+            case 'p':
+                ;// Hold the lock for x seconds (currently it's already locked)
+
+                int seconds = atoi(name);
+                if (seconds <= 0) {
+                    // Invalid argument smh
+                    mutex_unlock(&cmdlock);
+                    errWrap(sem_post(&cmdFeed), "Could not post on feeder semaphore!");
+                    break; 
+                }
+                printf("Pausa de %d segundos.\n", seconds);
+                sleep(seconds);
+
+                // Finally unlock it
+                mutex_unlock(&cmdlock);
+                errWrap(sem_post(&cmdFeed), "Could not post on feeder semaphore!");
+
+                break;
             case 'c':
                 // We're now unlocking because we've got the iNumber!
                 iNumber = obtainNewInumber(&fs);
